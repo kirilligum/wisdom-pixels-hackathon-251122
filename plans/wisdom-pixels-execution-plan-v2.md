@@ -1003,45 +1003,39 @@ app/src/components/
 
 | Phase | Status | Started | Completed | Owner | Notes |
 |-------|--------|---------|-----------|-------|-------|
-| M1: Database | Not Started | - | - | - | Ready to begin |
-| M2: Tools | Not Started | - | - | - | Depends on M1 |
-| M3: Agents | Not Started | - | - | - | Depends on M2 |
-| M4: Workflows | Not Started | - | - | - | Depends on M3 |
-| M5: REST API | Not Started | - | - | - | Depends on M4 |
-| M6: Frontend Migration | Not Started | - | - | - | Depends on M5 |
-| M7: Testing | Not Started | - | - | - | Depends on M6 |
-| M8: Documentation | Not Started | - | - | - | Depends on M7 |
+| M1: Database | Completed | ✅ | ✅ | eng | Schema + repositories + drizzle client in place |
+| M2: Tools | Completed | ✅ | ✅ | eng | db-tool, content-fetcher, image-generation (alpha-image-232), url-slug registered |
+| M3: Agents | Completed | ✅ | ✅ | eng | 5 specialized agents + legacy contentAgent registered |
+| M4: Workflows | Completed | ✅ | ✅ | eng | brandOnboarding, cardGeneration, publishing registered |
+| M5: REST API | Completed | ✅ | ✅ | eng | Express server with 8 endpoints at app/api/server.ts |
+| M6: Frontend Migration | Completed | ✅ | ✅ | eng | Frontend uses REST API client; Mastra client removed |
+| M7: Testing | Not Started | - | - | - | Need PRD-aligned Jest/Playwright coverage |
+| M8: Documentation | Not Started | - | - | - | README/API docs/cleanup pending |
 
 ---
 
 ## 10. Next Steps
 
-### Immediate Actions (Start Phase M1)
+### Immediate Actions (Phase M6 - Frontend Migration)
 
-1. **Verify fal.ai Model Availability**
-   ```bash
-   # Test alpha-image-232/edit-image
-   npm run test:fal-model
-   ```
+1. **Add REST API client**
+   - Create `app/src/lib/api-client.ts` wrapping the existing Express endpoints.
+   - Wire base URL from `VITE_API_URL` (fallback localhost:3001).
 
-2. **Install Database Dependencies**
-   ```bash
-   npm install @mastra/libsql better-sqlite3 drizzle-orm drizzle-kit
-   ```
+2. **Swap frontend to API**
+   - Replace `mastraClient` usage (e.g., `ContentGeneratorTab`, brand setup/dashboard flows) with `apiClient` calls.
+   - Add workflow polling/loading/error states for longer operations.
 
-3. **Create Database Schema File**
-   - Start with `app/mastra/db/schema.ts`
-   - Define all 6 tables from PRD section 7.1
+3. **Env wiring**
+   - Add `VITE_API_URL` to `.env.example`/`.env` and docs.
+   - Ensure API server uses CORS for Vite origin (already enabled).
 
-4. **Run Initial Migration**
-   ```bash
-   npx drizzle-kit generate:sqlite
-   npx drizzle-kit push:sqlite
-   ```
+4. **Clean up Mastra direct calls**
+   - Delete `src/lib/mastra.ts` once no longer used.
+   - Keep Mastra server for backend, but frontend should call only REST.
 
-5. **Create First Repository**
-   - Start with BrandRepository
-   - Implement basic CRUD
+5. **Prep for M7 tests**
+   - Add API integration tests for the 8 endpoints (Supertest + Jest scaffolding), aligning with PRD test IDs.
 
 ### Questions to Resolve Before Starting
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { BrandData, Card } from '../types';
-import flowformData from '../data/flowform-seed.json';
+import { apiClient } from '../lib/api-client';
 
 export default function CardDetail() {
   const { id } = useParams<{ id: string }>();
@@ -11,26 +11,50 @@ export default function CardDetail() {
   const [editedQuery, setEditedQuery] = useState('');
   const [editedResponse, setEditedResponse] = useState('');
   const [viewCount, setViewCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load FlowForm data
-    const brandData = flowformData as BrandData;
-    setData(brandData);
+    const load = async () => {
+      if (!id) return;
+      try {
+        setLoading(true);
+        setError(null);
 
-    // Find the specific card
-    const foundCard = brandData.cards.find(c => c.id === id);
-    if (foundCard) {
-      setCard(foundCard);
-      setEditedQuery(foundCard.query);
-      setEditedResponse(foundCard.response);
+        const { card } = await apiClient.getCard(id);
+        const [personasRes, envRes, influencersRes] = await Promise.all([
+          apiClient.getPersonas(card.brandId),
+          apiClient.getEnvironments(card.brandId),
+          apiClient.getInfluencers(),
+        ]);
+        const brandRes = await apiClient.getBrand(card.brandId);
 
-      // Increment view count (telemetry)
-      const viewKey = `card_views_${id}`;
-      const currentViews = parseInt(localStorage.getItem(viewKey) || '0', 10);
-      const newViews = currentViews + 1;
-      localStorage.setItem(viewKey, newViews.toString());
-      setViewCount(newViews);
-    }
+        const brandData: BrandData = {
+          brand: brandRes.brand,
+          personas: personasRes.personas,
+          environments: envRes.environments,
+          influencers: influencersRes.influencers,
+          cards: [card],
+        };
+
+        setCard(card);
+        setData(brandData);
+        setEditedQuery(card.query);
+        setEditedResponse(card.response);
+
+        const viewKey = `card_views_${id}`;
+        const currentViews = parseInt(localStorage.getItem(viewKey) || '0', 10);
+        const newViews = currentViews + 1;
+        localStorage.setItem(viewKey, newViews.toString());
+        setViewCount(newViews);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load card');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, [id]);
 
   const handleEdit = () => {
@@ -58,17 +82,21 @@ export default function CardDetail() {
     }
   };
 
-  if (!data || !card) {
+  if (loading) {
+    return <div style={{ padding: '2rem' }}>Loading card...</div>;
+  }
+
+  if (error || !data || !card) {
     return (
       <div style={{ padding: '2rem' }}>
-        <p>Loading card...</p>
-        <Link to="/brand/flowform">Back to Brand</Link>
+        <p style={{ color: '#c0392b' }}>{error || 'Card not found'}</p>
+        <Link to="/">Back to Home</Link>
       </div>
     );
   }
 
-  const influencer = data.influencers.find(i => i.id === card.influencerId);
-  const persona = data.personas.find(p => p.id === card.personaId);
+  const influencer = data.influencers.find(i => i.influencerId === card.influencerId);
+  const persona = data.personas.find(p => p.personaId === card.personaId);
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto' }}>
@@ -77,7 +105,7 @@ export default function CardDetail() {
         <h1 style={{ marginBottom: '0.5rem' }}>Card Details</h1>
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
           <div data-testid="card-id" style={{ color: '#6c757d', fontSize: '0.95rem' }}>
-            Card ID: {card.id}
+            Card ID: {card.cardId}
           </div>
           <div
             data-testid="view-count"
@@ -108,7 +136,7 @@ export default function CardDetail() {
         fontSize: '4rem',
         fontWeight: 'bold'
       }}>
-        {card.id.split('_')[1]}
+        {card.cardId.split('_')[1] ?? card.cardId}
       </div>
 
       {/* Card Info */}

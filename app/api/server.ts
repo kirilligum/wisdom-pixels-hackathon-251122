@@ -1,17 +1,21 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env' });
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { z } from 'zod';
 import { mastra } from '../mastra/index.js';
+import { contentAgent } from '../mastra/agents/content-agent.js';
 import { BrandsRepository } from '../mastra/db/repositories/brands.repository.js';
 import { PersonasRepository } from '../mastra/db/repositories/personas.repository.js';
 import { EnvironmentsRepository } from '../mastra/db/repositories/environments.repository.js';
 import { CardsRepository } from '../mastra/db/repositories/cards.repository.js';
+import { InfluencersRepository } from '../mastra/db/repositories/influencers.repository.js';
 import { db } from '../mastra/db/client.js';
 
 /**
  * REST API Server for Wisdom Pixels
  *
- * 8 Endpoints:
+ * 10 Endpoints:
  * 1. POST /api/brands - Create brand + run BrandOnboardingWorkflow
  * 2. GET /api/brands/:brandId - Get brand details
  * 3. GET /api/brands/:brandId/personas - List personas
@@ -20,6 +24,8 @@ import { db } from '../mastra/db/client.js';
  * 6. GET /api/brands/:brandId/cards - List cards (with filters)
  * 7. GET /api/cards/:cardId - Get card details
  * 8. POST /api/cards/publish - Run PublishingWorkflow
+ * 9. POST /api/content/generate - Proxy content agent for frontend
+ * 10. GET /api/influencers - List influencers
  */
 
 const app = express();
@@ -33,6 +39,7 @@ const brandsRepo = new BrandsRepository(db);
 const personasRepo = new PersonasRepository(db);
 const environmentsRepo = new EnvironmentsRepository(db);
 const cardsRepo = new CardsRepository(db);
+const influencersRepo = new InfluencersRepository(db);
 
 // Zod schemas for validation
 const createBrandSchema = z.object({
@@ -40,6 +47,9 @@ const createBrandSchema = z.object({
   domain: z.string().min(1),
   contentSources: z.array(z.string()).optional().default([]),
 });
+
+// Optional slug lookup
+const slugSchema = z.object({ slug: z.string().min(1) });
 
 const generateCardsSchema = z.object({
   brandId: z.string().uuid(),
@@ -116,6 +126,27 @@ app.get('/api/brands/:brandId', asyncHandler(async (req: Request, res: Response)
     return res.status(404).json({
       error: 'Brand not found',
     });
+  }
+
+  return res.json({ brand });
+}));
+
+// 2b. GET /api/brands - list all brands
+app.get('/api/brands', asyncHandler(async (_req: Request, res: Response) => {
+  const brands = await brandsRepo.findAll();
+  return res.json({ brands });
+}));
+
+// 2c. GET /api/brands/slug/:slug - find brand by slug
+app.get('/api/brands/slug/:slug', asyncHandler(async (req: Request, res: Response) => {
+  const validation = slugSchema.safeParse(req.params);
+  if (!validation.success) {
+    return res.status(400).json({ error: 'Invalid slug' });
+  }
+
+  const brand = await brandsRepo.findBySlug(validation.data.slug);
+  if (!brand) {
+    return res.status(404).json({ error: 'Brand not found' });
   }
 
   return res.json({ brand });
@@ -285,6 +316,27 @@ app.post('/api/cards/publish', asyncHandler(async (req: Request, res: Response) 
     publishedCardIds,
     message,
   });
+}));
+
+// 9. POST /api/content/generate - simple proxy to contentAgent for FE AI tab
+app.post('/api/content/generate', asyncHandler(async (req: Request, res: Response) => {
+  const { prompt } = req.body ?? {};
+
+  if (!prompt || typeof prompt !== 'string') {
+    return res.status(400).json({ error: 'Prompt is required' });
+  }
+
+  const response = await contentAgent.generate([
+    { role: 'user', content: prompt },
+  ]);
+
+  return res.json({ text: response.text });
+}));
+
+// 10. GET /api/influencers - list all influencers
+app.get('/api/influencers', asyncHandler(async (_req: Request, res: Response) => {
+  const influencers = await influencersRepo.findAll();
+  return res.json({ influencers });
 }));
 
 // Health check endpoint

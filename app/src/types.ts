@@ -4,59 +4,52 @@
  */
 
 export interface Brand {
-  id: string;
+  brandId: string;
   name: string;
   domain: string;
   contentSources: string[]; // URLs or text references
+  urlSlug?: string;
 }
 
 export interface Persona {
-  id: string;
+  personaId: string;
   brandId: string;
   label: string;
   description: string;
-  tags: string[]; // e.g., ["yoga", "WFH"]
+  tags: string[];
 }
 
 export interface Environment {
-  id: string;
+  environmentId: string;
   brandId: string;
   label: string;
   description: string;
-  type: 'apartment' | 'nature' | 'clinic' | 'gym' | 'park';
+  tags: string[];
 }
 
 export interface Influencer {
-  id: string;
-  brandId: string;
+  influencerId: string;
   name: string;
-  ageRange: string; // e.g., "30-35"
-  role: string; // e.g., "Doctor of PT & yoga teacher"
-  bioShort: string;
-  tags: string[]; // e.g., ["yoga", "clinic", "runner"]
-  imageUrl: string; // avatar URL
-  isDefault: boolean;
+  bio: string;
+  domain: string;
+  imageUrl: string;
   enabled: boolean;
-  synthetic: true; // v0: all influencers are synthetic
 }
 
 export interface Card {
-  id: string;
+  cardId: string;
   brandId: string;
-  personaId: string;
+  personaId?: string | null;
   influencerId: string;
-  environmentId?: string;
+  environmentId?: string | null;
   query: string;
   response: string;
   imageUrl: string;
-  url: string; // unique path, e.g., "/cards/card_a1b2c3"
-  status: 'draft' | 'ready' | 'published';
-  viewCount?: number; // for telemetry
+  imageBrief: string;
+  status: 'draft' | 'published' | string;
+  viewCount?: number;
 }
 
-/**
- * Full brand data structure with all related entities
- */
 export interface BrandData {
   brand: Brand;
   personas: Persona[];

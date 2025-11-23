@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { mastraClient } from '../lib/mastra';
+import { apiClient } from '../lib/api-client';
 
 export default function ContentGeneratorTab({ brandName }: { brandName: string }) {
   const [prompt, setPrompt] = useState('');
@@ -25,17 +25,12 @@ export default function ContentGeneratorTab({ brandName }: { brandName: string }
     setResult(null);
 
     try {
-      const agent = mastraClient.getAgent('contentAgent');
-
-      const response = await agent.generate({
-        messages: [{ role: 'user', content: prompt }]
-      });
-
+      const response = await apiClient.generateContent(prompt);
       setResult(response.text);
       setPrompt(''); // Clear prompt after successful generation
     } catch (err) {
       console.error('Content generation error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to generate content. Make sure the Mastra server is running (npm run dev:mastra).');
+      setError(err instanceof Error ? err.message : 'Failed to generate content. Make sure the API server is running (npm run dev:api).');
     } finally {
       setIsGenerating(false);
     }
@@ -55,9 +50,9 @@ export default function ContentGeneratorTab({ brandName }: { brandName: string }
         marginBottom: '1.5rem',
         border: '1px solid #bee5eb'
       }}>
-        <h4 style={{ margin: '0 0 0.5rem 0', color: '#0c5460' }}>Mastra Backend Required</h4>
+        <h4 style={{ margin: '0 0 0.5rem 0', color: '#0c5460' }}>API + Mastra Required</h4>
         <p style={{ margin: 0, fontSize: '0.9rem', color: '#0c5460' }}>
-          Run <code style={{ background: 'rgba(0,0,0,0.1)', padding: '0.2rem 0.4rem', borderRadius: '4px' }}>npm run dev:mastra</code> in a separate terminal to start the Mastra agent server.
+          Run <code style={{ background: 'rgba(0,0,0,0.1)', padding: '0.2rem 0.4rem', borderRadius: '4px' }}>npm run dev:api</code> and <code style={{ background: 'rgba(0,0,0,0.1)', padding: '0.2rem 0.4rem', borderRadius: '4px' }}>npm run dev:mastra</code> in separate terminals to enable content generation.
         </p>
       </div>
 

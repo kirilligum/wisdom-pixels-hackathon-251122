@@ -1,6 +1,24 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { apiClient } from '../lib/api-client';
 
 export default function HomePage() {
+  const [flowFormId, setFlowFormId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { brand } = await apiClient.getBrandBySlug('flowform');
+        setFlowFormId(brand.brandId);
+      } catch (e) {
+        setFlowFormId(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1>Wisdom Pixels</h1>
@@ -15,14 +33,19 @@ export default function HomePage() {
         }}>
           Add Brand
         </Link>
-        <Link to="/brand/flowform" style={{
-          padding: '0.5rem 1rem',
-          background: '#007bff',
-          color: 'white',
-          textDecoration: 'none',
-          borderRadius: '4px'
-        }}>
-          View FlowForm Brand
+        <Link
+          to={flowFormId ? `/brand/${flowFormId}` : '/setup'}
+          style={{
+            padding: '0.5rem 1rem',
+            background: flowFormId ? '#007bff' : '#6c757d',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '4px',
+            pointerEvents: flowFormId ? 'auto' : 'none',
+            opacity: loading ? 0.6 : 1
+          }}
+        >
+          {flowFormId ? 'View FlowForm Brand' : loading ? 'Loading FlowForm…' : 'Run Setup'}
         </Link>
       </div>
     </div>

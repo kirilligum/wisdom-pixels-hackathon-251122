@@ -130,9 +130,9 @@ async function seed() {
     ]);
     console.log(`✅ Created ${influencers.length} influencers`);
 
-    // 5. Create sample cards (5 initial cards)
+    // 5. Create sample cards (20 total)
     console.log('\n🎴 Creating sample cards...');
-    const cards = await Promise.all([
+    const baseCards = [
       cardsRepo.create({
         brandId: brand.brandId,
         influencerId: influencers[0].influencerId,
@@ -191,7 +191,29 @@ async function seed() {
         imageBrief: 'Professional woman in corporate office demonstrating FlowForm enterprise integrations on multiple monitors, showing connected tools and workflows',
         status: 'draft',
       }),
-    ]);
+    ];
+
+    // Generate additional placeholder cards up to 20
+    const extraCards = Array.from({ length: 15 }).map((_, idx) => {
+      const persona = personas[idx % personas.length];
+      const environment = environments[idx % environments.length];
+      const influencer = influencers[idx % influencers.length];
+      const n = idx + 6;
+
+      return cardsRepo.create({
+        brandId: brand.brandId,
+        influencerId: influencer.influencerId,
+        personaId: persona.personaId,
+        environmentId: environment.environmentId,
+        query: `How does ${influencer.name} use FlowForm for scenario ${n}?`,
+        response: `${influencer.name} highlights FlowForm's value for scenario ${n}, focusing on collaboration speed and clarity for ${persona.label}.`,
+        imageUrl: `https://placeholder-image.com/flowform-card-${n}.jpg`,
+        imageBrief: `${influencer.name} in ${environment.label} demonstrating FlowForm benefits for ${persona.label}`,
+        status: 'draft',
+      });
+    });
+
+    const cards = await Promise.all([...baseCards, ...extraCards]);
     console.log(`✅ Created ${cards.length} sample cards`);
 
     // Summary

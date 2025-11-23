@@ -25,7 +25,7 @@ export default function CardGallery({ cards, influencers, personas }: CardGaller
   });
 
   const getInfluencerName = (influencerId: string) => {
-    return influencers.find(i => i.id === influencerId)?.name || 'Unknown';
+    return influencers.find(i => i.influencerId === influencerId)?.name || 'Unknown';
   };
 
   return (
@@ -49,7 +49,7 @@ export default function CardGallery({ cards, influencers, personas }: CardGaller
           >
             <option value="all">All Influencers</option>
             {influencers.map(inf => (
-              <option key={inf.id} value={inf.id}>{inf.name}</option>
+              <option key={inf.influencerId} value={inf.influencerId}>{inf.name}</option>
             ))}
           </select>
         </div>
@@ -72,7 +72,7 @@ export default function CardGallery({ cards, influencers, personas }: CardGaller
           >
             <option value="all">All Personas</option>
             {personas.map(persona => (
-              <option key={persona.id} value={persona.id}>{persona.label}</option>
+              <option key={persona.personaId} value={persona.personaId}>{persona.label}</option>
             ))}
           </select>
         </div>
@@ -89,9 +89,9 @@ export default function CardGallery({ cards, influencers, personas }: CardGaller
       }}>
         {filteredCards.map(card => (
           <div
-            key={card.id}
+            key={card.cardId}
             data-testid="card-item"
-            onClick={() => navigate(card.url)}
+            onClick={() => navigate(`/cards/${card.cardId}`)}
             style={{
               background: 'white',
               borderRadius: '8px',
@@ -123,7 +123,7 @@ export default function CardGallery({ cards, influencers, personas }: CardGaller
                 fontWeight: 'bold'
               }}
             >
-              {card.id.split('_')[1]}
+              {card.cardId && card.cardId.includes('_') ? card.cardId.split('_')[1] : card.cardId}
             </div>
 
             <div style={{ padding: '1rem' }}>

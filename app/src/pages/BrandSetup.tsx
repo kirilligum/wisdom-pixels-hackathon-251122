@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../lib/api-client';
 
 export default function BrandSetup() {
   const navigate = useNavigate();
@@ -7,18 +8,32 @@ export default function BrandSetup() {
   const [domain, setDomain] = useState('');
   const [urls, setUrls] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     setIsAnalyzing(true);
+    setError(null);
 
-    // Simulate analysis delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      const contentSources = urls
+        .split('\n')
+        .map(u => u.trim())
+        .filter(Boolean);
 
-    // For demo, navigate to FlowForm brand dashboard
-    setIsAnalyzing(false);
-    navigate('/brand/flowform');
+      const { brand } = await apiClient.createBrand({
+        name: brandName,
+        domain,
+        contentSources,
+      });
+
+      navigate(`/brand/${brand.brandId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create brand');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -132,6 +147,18 @@ export default function BrandSetup() {
           <p style={{ margin: 0 }}>
             Extracting personas, environments, influencer archetypes, and value propositions...
           </p>
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          marginTop: '1rem',
+          padding: '0.75rem',
+          background: '#f8d7da',
+          color: '#721c24',
+          borderRadius: '4px'
+        }}>
+          {error}
         </div>
       )}
     </div>

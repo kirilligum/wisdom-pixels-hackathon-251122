@@ -1,42 +1,77 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import type { BrandData, Persona, Environment } from '../types';
-import flowformData from '../data/flowform-seed.json';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import type { BrandData, Persona, Environment, Influencer, Card } from '../types';
 import CardGallery from '../components/CardGallery';
 import ImageGeneratorTab from '../components/ImageGeneratorTab';
 import ContentGeneratorTab from '../components/ContentGeneratorTab';
+import { apiClient } from '../lib/api-client';
 
 type TabType = 'personas' | 'environments' | 'influencers' | 'cards' | 'publish' | 'images' | 'ai-content';
 
 export default function BrandDashboard() {
+  const { brandId } = useParams<{ brandId: string }>();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('personas');
   const [data, setData] = useState<BrandData | null>(null);
   const [influencerStates, setInfluencerStates] = useState<Record<string, { enabled: boolean; isDefault: boolean }>>({});
   const [cardStatuses, setCardStatuses] = useState<Record<string, 'draft' | 'ready' | 'published'>>({});
   const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load FlowForm data
-    const brandData = flowformData as BrandData;
-    setData(brandData);
+    const load = async () => {
+      if (!brandId) {
+        setError('Missing brandId');
+        setLoading(false);
+        return;
+      }
 
-    // Initialize influencer states from seed data
-    const initialStates: Record<string, { enabled: boolean; isDefault: boolean }> = {};
-    brandData.influencers.forEach((inf) => {
-      initialStates[inf.id] = {
-        enabled: inf.enabled,
-        isDefault: inf.isDefault
-      };
-    });
-    setInfluencerStates(initialStates);
+      try {
+        setLoading(true);
+        setError(null);
 
-    // Initialize card statuses from seed data
-    const initialCardStatuses: Record<string, 'draft' | 'ready' | 'published'> = {};
-    brandData.cards.forEach((card) => {
-      initialCardStatuses[card.id] = card.status;
-    });
-    setCardStatuses(initialCardStatuses);
-  }, []);
+        const [brandRes, personasRes, environmentsRes, cardsRes, influencersRes] = await Promise.all([
+          apiClient.getBrand(brandId),
+          apiClient.getPersonas(brandId),
+          apiClient.getEnvironments(brandId),
+          apiClient.getCards(brandId),
+          apiClient.getInfluencers(),
+        ]);
+
+        const brandData: BrandData = {
+          brand: brandRes.brand,
+          personas: personasRes.personas,
+          environments: environmentsRes.environments,
+          influencers: influencersRes.influencers || [],
+          cards: cardsRes.cards,
+        };
+
+        setData(brandData);
+
+        const initialStates: Record<string, { enabled: boolean; isDefault: boolean }> = {};
+        brandData.influencers.forEach((inf) => {
+          initialStates[inf.influencerId] = {
+            enabled: inf.enabled,
+            isDefault: false,
+          };
+        });
+        setInfluencerStates(initialStates);
+
+        const initialCardStatuses: Record<string, 'draft' | 'ready' | 'published'> = {};
+        brandData.cards.forEach((card) => {
+          initialCardStatuses[card.cardId] = (card.status as 'draft' | 'ready' | 'published') ?? 'draft';
+        });
+        setCardStatuses(initialCardStatuses);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load brand data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [brandId]);
 
   const handleToggleInfluencer = (influencerId: string) => {
     setInfluencerStates(prev => ({
@@ -70,17 +105,42 @@ export default function BrandDashboard() {
     });
   };
 
-  const handlePublishSelected = () => {
-    const newStatuses = { ...cardStatuses };
-    selectedCards.forEach(cardId => {
-      newStatuses[cardId] = 'published';
-    });
-    setCardStatuses(newStatuses);
-    setSelectedCards(new Set()); // Clear selection after publishing
+  const handlePublishSelected = async () => {
+    if (selectedCards.size === 0) return;
+    try {
+      await apiClient.publishCards(Array.from(selectedCards));
+      const newStatuses = { ...cardStatuses };
+      selectedCards.forEach(cardId => {
+        newStatuses[cardId] = 'published';
+      });
+      setCardStatuses(newStatuses);
+      setSelectedCards(new Set());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to publish cards');
+    }
   };
 
-  if (!data) {
+  const handleGenerateCards = async () => {
+    if (!brandId) return;
+    try {
+      await apiClient.generateCards(brandId);
+      // reload cards after generation
+      const cardsRes = await apiClient.getCards(brandId);
+      setData(prev => prev ? { ...prev, cards: cardsRes.cards } : prev);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to generate cards');
+    }
+  };
+
+  if (loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
+  }
+
+  if (error || !data) {
+    return <div style={{ padding: '2rem' }}>
+      <p style={{ color: '#c0392b' }}>{error || 'Failed to load brand'}</p>
+      <button onClick={() => navigate('/')} style={{ padding: '0.5rem 1rem' }}>Back</button>
+    </div>;
   }
 
   const tabStyle = (isActive: boolean) => ({
@@ -209,7 +269,7 @@ function PersonasTab({ personas }: { personas: Persona[] }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
         {personas.map((persona) => (
           <div
-            key={persona.id}
+            key={persona.personaId}
             data-testid="persona-card"
             style={{
               padding: '1.5rem',
@@ -252,7 +312,7 @@ function EnvironmentsTab({ environments }: { environments: Environment[] }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
         {environments.map((env) => (
           <div
-            key={env.id}
+            key={env.environmentId}
             data-testid="environment-card"
             style={{
               padding: '1.5rem',
@@ -262,17 +322,6 @@ function EnvironmentsTab({ environments }: { environments: Environment[] }) {
             }}
           >
             <h3 style={{ marginBottom: '0.5rem', color: '#28a745' }}>{env.label}</h3>
-            <p style={{
-              marginBottom: '0.75rem',
-              padding: '0.25rem 0.75rem',
-              background: '#d4edda',
-              color: '#155724',
-              borderRadius: '4px',
-              fontSize: '0.85rem',
-              display: 'inline-block'
-            }}>
-              {env.type}
-            </p>
             <p style={{ color: '#495057', fontSize: '0.95rem', marginTop: '0.75rem' }}>
               {env.description}
             </p>
@@ -289,7 +338,7 @@ function InfluencersTab({
   onToggle,
   onSetDefault
 }: {
-  influencers: any[];
+  influencers: Influencer[];
   influencerStates: Record<string, { enabled: boolean; isDefault: boolean }>;
   onToggle: (id: string) => void;
   onSetDefault: (id: string) => void;
@@ -299,10 +348,10 @@ function InfluencersTab({
       <h2 style={{ marginBottom: '1.5rem' }}>Influencer Profiles</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
         {influencers.map((influencer) => {
-          const state = influencerStates[influencer.id] || { enabled: false, isDefault: false };
+          const state = influencerStates[influencer.influencerId] || { enabled: false, isDefault: false };
           return (
             <div
-              key={influencer.id}
+              key={influencer.influencerId}
               data-testid="influencer-card"
               style={{
                 padding: '1.5rem',
@@ -331,27 +380,11 @@ function InfluencersTab({
                 )}
               </div>
               <p style={{ marginBottom: '0.5rem', color: '#6c757d', fontSize: '0.9rem' }}>
-                Age: {influencer.ageRange} • {influencer.role}
+                Domain: {influencer.domain}
               </p>
               <p style={{ marginBottom: '1rem', color: '#495057', fontSize: '0.95rem' }}>
-                {influencer.bioShort}
+                {influencer.bio}
               </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-                {influencer.tags.map((tag: string) => (
-                  <span
-                    key={tag}
-                    style={{
-                      padding: '0.25rem 0.75rem',
-                      background: '#f3e5ff',
-                      color: '#6f42c1',
-                      borderRadius: '12px',
-                      fontSize: '0.85rem'
-                    }}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
 
               {/* Controls */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
@@ -360,14 +393,14 @@ function InfluencersTab({
                     type="checkbox"
                     data-testid="enable-toggle"
                     checked={state.enabled}
-                    onChange={() => onToggle(influencer.id)}
+                    onChange={() => onToggle(influencer.influencerId)}
                     style={{ cursor: 'pointer' }}
                   />
                   <span style={{ fontSize: '0.9rem', color: '#495057' }}>Enabled</span>
                 </label>
                 <button
                   data-testid="set-default-button"
-                  onClick={() => onSetDefault(influencer.id)}
+                  onClick={() => onSetDefault(influencer.influencerId)}
                   disabled={state.isDefault}
                   style={{
                     padding: '0.5rem 1rem',
@@ -399,7 +432,7 @@ function PublishTab({
   onToggleSelection,
   onPublish
 }: {
-  cards: any[];
+  cards: Card[];
   cardStatuses: Record<string, 'draft' | 'ready' | 'published'>;
   selectedCards: Set<string>;
   onToggleSelection: (id: string) => void;
@@ -435,12 +468,12 @@ function PublishTab({
 
       <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden' }}>
         {cards.map(card => {
-          const status = cardStatuses[card.id] || 'draft';
-          const isSelected = selectedCards.has(card.id);
+          const status = cardStatuses[card.cardId] || 'draft';
+          const isSelected = selectedCards.has(card.cardId);
 
           return (
             <div
-              key={card.id}
+              key={card.cardId}
               data-testid="publish-card-item"
               style={{
                 display: 'flex',
@@ -453,29 +486,17 @@ function PublishTab({
               <input
                 type="checkbox"
                 checked={isSelected}
-                onChange={() => onToggleSelection(card.id)}
+                onChange={() => onToggleSelection(card.cardId)}
                 style={{ marginRight: '1rem', cursor: 'pointer', width: '18px', height: '18px' }}
               />
 
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>
-                  {card.id}
+                  {card.cardId}
                 </div>
                 <div style={{ fontSize: '0.9rem', color: '#6c757d', marginBottom: '0.25rem' }}>
                   {card.query.substring(0, 80)}...
                 </div>
-                {status === 'published' && (
-                  <div
-                    data-testid="card-url"
-                    style={{
-                      fontSize: '0.85rem',
-                      color: '#007bff',
-                      fontFamily: 'monospace'
-                    }}
-                  >
-                    {card.url}
-                  </div>
-                )}
               </div>
 
               <span
