@@ -137,45 +137,45 @@ flowchart LR
   end
 
   subgraph Frontend[React Frontend]
-    UI[Brand Dashboard\n(Product, Influencers, Cards, Publish)]
+    UI[Brand Dashboard<br/>Product, Influencers, Cards]
   end
 
   subgraph APILayer[Hono API]
-    API[REST API\n/api/brands, /api/influencers,\n/api/cards, /api/content]
+    API[REST API<br/>/api/brands, /api/influencers,<br/>/api/cards, /api/content]
   end
 
   subgraph MastraApp[Mastra App]
-    Agent[Content Agent\n(personas, envs, training cards)]
-    WF[Workflows\nBrandOnboarding, CardGeneration, Publishing]
+    Agent[Content Agent<br/>personas, envs, training cards]
+    WF[Workflows<br/>BrandOnboarding, CardGeneration, Publishing]
   end
 
   subgraph DataLayer[Data & Models]
-    DB[(SQLite DB\nbrands, personas,\nenvironments, influencers,\ncards, workflow_runs)]
-    Fal[fal.ai Alpha Image 232\n(edit-image)]
+    DB[(SQLite DB<br/>brands, personas,<br/>environments, influencers,<br/>cards, workflow_runs)]
+    Fal[fal.ai Alpha Image 232<br/>(edit-image)]
   end
 
   subgraph DatasetExport[AI Training Dataset]
-    DS[Wisdom Cards JSONL\nquery, answer, imageUrl]
+    DS[Wisdom Cards JSONL<br/>query, answer, imageUrl]
   end
 
-  U -->|Paste landing page URLs,\nconfigure product| UI
-  UI -->|Brand setup,\ncard actions| API
+  U -->|"Paste landing page URLs<br/>configure product"| UI
+  UI -->|"Brand setup<br/>card actions"| API
 
-  API -->|BrandOnboardingWorkflow| WF
+  API -->|"BrandOnboardingWorkflow"| WF
   WF --> Agent
-  Agent -->|Personas, environments,\nvalue props| DB
+  Agent -->|"Personas, environments<br/>value props"| DB
 
-  API -->|Find New influencer,\nget gallery| DB
-  API -->|generate gallery\n(edit-image)| Fal
-  Fal -->|image URLs| DB
+  API -->|"Find New influencer<br/>get gallery"| DB
+  API -->|"generate gallery<br/>(edit-image)"| Fal
+  Fal -->|"image URLs"| DB
 
-  API -->|CardGenerationWorkflow| WF
+  API -->|"CardGenerationWorkflow"| WF
   WF --> Agent
-  Agent -->|Wisdom Cards\n(query, answer, imageUrl)| DB
+  Agent -->|"Wisdom Cards<br/>(query, answer, imageUrl)"| DB
 
-  DB -->|/api/brands/:id/cards| API --> UI
+  DB -->|"/api/brands/:id/cards"| API --> UI
 
-  DB -->|export cards\nas JSONL| DS
+  DB -->|"export cards<br/>as JSONL"| DS
 ```
 
 **How a brand creates a dataset for its product**

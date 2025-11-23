@@ -4,7 +4,7 @@ import type { BrandData, Persona, Environment, Influencer, Card } from '../types
 import CardGallery from '../components/CardGallery';
 import { apiClient } from '../lib/api-client';
 
-type TabType = 'product' | 'influencers' | 'cards' | 'publish';
+type TabType = 'product' | 'influencers' | 'cards';
 
 const MetricPill = ({ label, value }: { label: string; value: string }) => (
   <div style={{ padding: '0.35rem 0.75rem', background: '#e9ecef', borderRadius: '12px', fontSize: '0.85rem', color: '#495057', border: '1px solid #dee2e6' }}>
@@ -324,12 +324,6 @@ export default function BrandDashboard() {
         >
           Cards
         </button>
-        <button
-          onClick={() => setActiveTab('publish')}
-          style={tabStyle(activeTab === 'publish')}
-        >
-          Publish
-        </button>
       </div>
 
       {/* Tab Content */}
@@ -414,19 +408,6 @@ export default function BrandDashboard() {
             influencers={data.influencers}
             personas={data.personas}
             onImageClick={(url) => setLightboxUrl(url)}
-          />
-        )}
-        {activeTab === 'publish' && (
-          <PublishTab
-            cards={data.cards}
-            cardStatuses={cardStatuses}
-            selectedCards={selectedCards}
-            onToggleSelection={handleToggleCardSelection}
-            onPublish={handlePublishSelected}
-            onSelectAll={handleSelectAllCards}
-            onClearSelection={handleClearSelection}
-            searchTerm={cardSearch}
-            onSearchChange={setCardSearch}
           />
         )}
       </div>
