@@ -3,12 +3,7 @@ import request from 'supertest';
 import express, { Express } from 'express';
 import cors from 'cors';
 import { z } from 'zod';
-import { db } from '../../../mastra/db/client';
-import { BrandsRepository } from '../../../mastra/db/repositories/brands.repository';
-import { PersonasRepository } from '../../../mastra/db/repositories/personas.repository';
-import { EnvironmentsRepository } from '../../../mastra/db/repositories/environments.repository';
-import { CardsRepository } from '../../../mastra/db/repositories/cards.repository';
-import { InfluencersRepository } from '../../../mastra/db/repositories/influencers.repository';
+import { setupTestDb, type TestDatabase } from '../../helpers/db-test-helper';
 
 /**
  * Phase M5: API Tests
@@ -20,19 +15,21 @@ import { InfluencersRepository } from '../../../mastra/db/repositories/influence
 
 describe('Phase M5: REST API', () => {
   let app: Express;
-  let brandsRepo: BrandsRepository;
-  let personasRepo: PersonasRepository;
-  let environmentsRepo: EnvironmentsRepository;
-  let cardsRepo: CardsRepository;
-  let influencersRepo: InfluencersRepository;
+  let testDb: TestDatabase;
+  let brandsRepo: TestDatabase['repos']['brands'];
+  let personasRepo: TestDatabase['repos']['personas'];
+  let environmentsRepo: TestDatabase['repos']['environments'];
+  let cardsRepo: TestDatabase['repos']['cards'];
+  let influencersRepo: TestDatabase['repos']['influencers'];
 
   beforeAll(() => {
-    // Initialize repositories
-    brandsRepo = new BrandsRepository(db);
-    personasRepo = new PersonasRepository(db);
-    environmentsRepo = new EnvironmentsRepository(db);
-    cardsRepo = new CardsRepository(db);
-    influencersRepo = new InfluencersRepository(db);
+    // Initialize isolated in-memory test DB
+    testDb = setupTestDb();
+    brandsRepo = testDb.repos.brands;
+    personasRepo = testDb.repos.personas;
+    environmentsRepo = testDb.repos.environments;
+    cardsRepo = testDb.repos.cards;
+    influencersRepo = testDb.repos.influencers;
 
     // Create a simplified test app
     app = express();
@@ -123,6 +120,10 @@ describe('Phase M5: REST API', () => {
         res.status(500).json({ error: 'Internal server error' });
       }
     });
+  });
+
+  afterAll(() => {
+    testDb.cleanup();
   });
 
   describe('Health Check', () => {
