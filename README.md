@@ -5,6 +5,13 @@ Direct link: https://youtu.be/CQqQXRbRwN4
 
 # Wisdom Pixels – Hackathon 2025 Demo
 
+## Screenshots
+
+![Wisdom Pixels Screen 1](images/wisdojm_pixels_screen_1.png)
+![Wisdom Pixels Screen 2](images/wisdojm_pixels_screen_2.png)
+![Wisdom Pixels Screen 3](images/wisdojm_pixels_screen_3.png)
+![Wisdom Pixels Screen 4](images/wisdojm_pixels_screen_4.png)
+
 ## Overview
 
 Wisdom Pixels is an agentic AI system that turns a brand’s marketing content into **multi‑modal training examples for future AI assistants**.
