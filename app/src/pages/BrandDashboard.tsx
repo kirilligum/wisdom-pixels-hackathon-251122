@@ -2,11 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { BrandData, Persona, Environment, Influencer, Card } from '../types';
 import CardGallery from '../components/CardGallery';
-import ImageGeneratorTab from '../components/ImageGeneratorTab';
-import ContentGeneratorTab from '../components/ContentGeneratorTab';
 import { apiClient } from '../lib/api-client';
 
-type TabType = 'product' | 'influencers' | 'cards' | 'publish' | 'images' | 'ai-content';
+type TabType = 'product' | 'influencers' | 'cards' | 'publish';
 
 const MetricPill = ({ label, value }: { label: string; value: string }) => (
   <div style={{ padding: '0.35rem 0.75rem', background: '#e9ecef', borderRadius: '12px', fontSize: '0.85rem', color: '#495057', border: '1px solid #dee2e6' }}>
@@ -223,6 +221,24 @@ export default function BrandDashboard() {
     }
   };
 
+  const handleUploadProductImage = async (dataUrl: string) => {
+    try {
+      if (!data) return;
+      console.log('[upload] starting upload for brand', data.brand.brandId);
+      await apiClient.addProductImage(data.brand.brandId, dataUrl);
+      console.log('[upload] saved to DB, fetching fresh brand');
+      const fresh = await apiClient.getBrand(data.brand.brandId);
+      const freshImages = fresh.brand.productImages || [];
+      console.log('[upload] fetched brand with productImages count', freshImages.length);
+      setBrandProductImages(freshImages);
+      setData(prev => prev ? { ...prev, brand: { ...fresh.brand } } : prev);
+      console.log('[upload] state updated with DB images');
+    } catch (e) {
+      console.error('Upload failed', e);
+      setError(e instanceof Error ? e.message : 'Failed to upload product image');
+    }
+  };
+
   const handleToggleCardSelection = (cardId: string) => {
     setSelectedCards(prev => {
       const newSet = new Set(prev);
@@ -313,18 +329,6 @@ export default function BrandDashboard() {
           style={tabStyle(activeTab === 'publish')}
         >
           Publish
-        </button>
-        <button
-          onClick={() => setActiveTab('images')}
-          style={tabStyle(activeTab === 'images')}
-        >
-          Generate Images
-        </button>
-        <button
-          onClick={() => setActiveTab('ai-content')}
-          style={tabStyle(activeTab === 'ai-content')}
-        >
-          AI Content
         </button>
       </div>
 
@@ -424,12 +428,6 @@ export default function BrandDashboard() {
             searchTerm={cardSearch}
             onSearchChange={setCardSearch}
           />
-        )}
-        {activeTab === 'images' && (
-          <ImageGeneratorTab brandName={data.brand.name} />
-        )}
-        {activeTab === 'ai-content' && (
-          <ContentGeneratorTab brandName={data.brand.name} />
         )}
       </div>
 
@@ -893,14 +891,3 @@ function PublishTab({
     </div>
   );
 }
-  const handleUploadProductImage = async (dataUrl: string) => {
-    try {
-      if (!data) return;
-      const res = await apiClient.addProductImage(data.brand.brandId, dataUrl);
-      const next = res.brand.productImages || [];
-      setBrandProductImages(next);
-      setData(prev => prev ? { ...prev, brand: { ...prev.brand, productImages: next } } : prev);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to upload product image');
-    }
-  };
