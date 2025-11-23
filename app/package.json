@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mastra": "mastra dev --dir mastra",
     "build": "tsc -b && vite build",
+    "build:mastra": "mastra build --dir mastra",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "jest",
@@ -14,9 +16,14 @@
   },
   "dependencies": {
     "@fal-ai/client": "^1.7.2",
+    "@mastra/client-js": "^0.16.14",
+    "@mastra/core": "^0.24.5",
+    "@mastra/libsql": "^0.16.2",
+    "mastra": "^0.18.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^7.9.6"
+    "react-router-dom": "^7.9.6",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

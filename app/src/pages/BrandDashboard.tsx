@@ -4,8 +4,9 @@ import type { BrandData, Persona, Environment } from '../types';
 import flowformData from '../data/flowform-seed.json';
 import CardGallery from '../components/CardGallery';
 import ImageGeneratorTab from '../components/ImageGeneratorTab';
+import ContentGeneratorTab from '../components/ContentGeneratorTab';
 
-type TabType = 'personas' | 'environments' | 'influencers' | 'cards' | 'publish' | 'images';
+type TabType = 'personas' | 'environments' | 'influencers' | 'cards' | 'publish' | 'images' | 'ai-content';
 
 export default function BrandDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('personas');
@@ -138,6 +139,12 @@ export default function BrandDashboard() {
         >
           Generate Images
         </button>
+        <button
+          onClick={() => setActiveTab('ai-content')}
+          style={tabStyle(activeTab === 'ai-content')}
+        >
+          AI Content
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -174,6 +181,9 @@ export default function BrandDashboard() {
         )}
         {activeTab === 'images' && (
           <ImageGeneratorTab brandName={data.brand.name} />
+        )}
+        {activeTab === 'ai-content' && (
+          <ContentGeneratorTab brandName={data.brand.name} />
         )}
       </div>
 
