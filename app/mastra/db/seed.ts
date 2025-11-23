@@ -52,62 +52,70 @@ async function seed() {
     });
     console.log(`✅ Brand created: ${brand.name} (${brand.brandId})`);
 
-    // 2. Create 3+ personas
+    // 2. Create FlowForm-specific personas (ideal customers)
     console.log('\n👥 Creating personas...');
     const personas = await Promise.all([
       personasRepo.create({
         brandId: brand.brandId,
-        label: 'Busy Project Manager',
-        description: 'A professional managing multiple projects simultaneously, needs efficient tools to stay organized and meet deadlines.',
-        tags: ['time-constrained', 'results-driven', 'team-leader'],
+        label: 'WFH Yoga Creative',
+        description:
+          'Remote designer or content creator working from a small city apartment, using yoga and short flows to stay sane after long laptop days.',
+        tags: ['remote-work', 'yoga-first', 'small-apartment', 'creative'],
       }),
       personasRepo.create({
         brandId: brand.brandId,
-        label: 'Remote Team Lead',
-        description: 'Leads a distributed team across time zones, relies on async communication and collaboration tools.',
-        tags: ['remote-first', 'communication-focused', 'flexible'],
+        label: 'Mid-Career Desk Worker with Stiff Back',
+        description:
+          '35–50 year old knowledge worker who sits in meetings all day, wants to fix a stiff back and tight hips with safer yoga and light strength.',
+        tags: ['desk-bound', 'back-pain', 'light-strength', 'posture'],
       }),
       personasRepo.create({
         brandId: brand.brandId,
-        label: 'Startup Founder',
-        description: 'Building a company from scratch, needs cost-effective solutions that scale with growth.',
-        tags: ['budget-conscious', 'growth-minded', 'agile'],
+        label: 'Beginner Runner Who Loves Yoga',
+        description:
+          'Office worker training for a first 10K, already does yoga and wants their running form to feel as aligned and mindful as their mat practice.',
+        tags: ['beginner-runner', 'yoga-cross-training', 'injury-prevention'],
       }),
       personasRepo.create({
         brandId: brand.brandId,
-        label: 'Freelance Consultant',
-        description: 'Works with multiple clients, needs to track various projects and maintain professional organization.',
-        tags: ['multi-client', 'professional', 'organized'],
+        label: 'Young Parent or Caregiver Squeezing In Workouts',
+        description:
+          'Juggling kids, caregiving, and work; can only manage short sessions at home and wants each 10–20 minutes of yoga or strength to be safe and effective.',
+        tags: ['time-poor', 'home-workouts', 'efficiency', 'caregiver'],
       }),
     ]);
     console.log(`✅ Created ${personas.length} personas`);
 
-    // 3. Create 3+ environments
+    // 3. Create FlowForm-specific environments
     console.log('\n🏢 Creating environments...');
     const environments = await Promise.all([
       environmentsRepo.create({
         brandId: brand.brandId,
-        label: 'Modern Office',
-        description: 'Contemporary workspace with collaborative areas and private focus zones.',
-        tags: ['professional', 'collaborative', 'hybrid-work'],
+        label: 'NYC Apartment Yoga Corner',
+        description:
+          'A small New York City apartment living room with a yoga mat between the couch and coffee table, plants by the window, and just enough space to flow.',
+        tags: ['nyc-apartment', 'small-space', 'yoga', 'indoor'],
       }),
       environmentsRepo.create({
         brandId: brand.brandId,
-        label: 'Home Office',
-        description: 'Comfortable remote workspace with desk setup and video conferencing capabilities.',
-        tags: ['remote', 'comfortable', 'focused'],
+        label: 'City Track and Park Loop',
+        description:
+          'An urban running track and nearby park loop in the city, with skyline views and mixed pavement and path surfaces for easy runs and form drills.',
+        tags: ['city-track', 'park-loop', 'running', 'outdoor'],
       }),
       environmentsRepo.create({
         brandId: brand.brandId,
-        label: 'Coffee Shop',
-        description: 'Casual working environment with laptop and coffee, showing flexibility of modern work.',
-        tags: ['flexible', 'casual', 'mobile'],
+        label: 'Clinic or Research Office with Standing Desk',
+        description:
+          'A bright clinic or research office where a movement specialist uses a standing desk, screens with simple joint diagrams, and a mat for demonstrations.',
+        tags: ['clinic', 'research', 'standing-desk', 'demo-space'],
       }),
       environmentsRepo.create({
         brandId: brand.brandId,
-        label: 'Conference Room',
-        description: 'Professional meeting space for team collaboration and presentations.',
-        tags: ['formal', 'team-oriented', 'presentation'],
+        label: 'Compact Home Strength Corner',
+        description:
+          'A corner of a living room or garage with a mat, a few dumbbells, and a small rack—just enough space for squats, hinges, and simple strength circuits.',
+        tags: ['home-gym', 'strength-corner', 'compact', 'indoor'],
       }),
     ]);
     console.log(`✅ Created ${environments.length} environments`);

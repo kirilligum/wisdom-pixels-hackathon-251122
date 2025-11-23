@@ -31,6 +31,7 @@ export default function BrandDashboard() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [brandProductImages, setBrandProductImages] = useState<string[]>([]);
   const [isGeneratingDataset, setIsGeneratingDataset] = useState(false);
+  const [datasetUrl, setDatasetUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -402,6 +403,12 @@ export default function BrandDashboard() {
     }, 3000);
   };
 
+  const handlePublishDataset = () => {
+    if (!data) return;
+    const url = `${window.location.origin}/dataset-placeholder.html`;
+    setDatasetUrl(url);
+  };
+
   if (loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
@@ -557,6 +564,44 @@ export default function BrandDashboard() {
                 >
                   {isGeneratingDataset ? 'Generating…' : 'Generate Dataset'}
                 </button>
+
+                {datasetUrl ? (
+                  <a
+                    href={datasetUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      padding: '0.6rem 1.25rem',
+                      background: '#28a745',
+                      color: 'white',
+                      borderRadius: '4px',
+                      textDecoration: 'none',
+                      fontWeight: 'bold',
+                      fontSize: '0.95rem',
+                    }}
+                    title="Open published dataset page in a new tab"
+                  >
+                    Open Dataset Page
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handlePublishDataset}
+                    style={{
+                      padding: '0.6rem 1.25rem',
+                      background: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '0.95rem',
+                    }}
+                    title="Publish this brand's cards as a crawlable dataset page"
+                  >
+                    Publish
+                  </button>
+                )}
               </div>
             </div>
 
@@ -614,6 +659,82 @@ function BrandTab({ brand, personas, environments, cards, onImageClick, onUpload
   const fallbackImages = cards.slice(0, 3).map(c => c.imageUrl || `https://placehold.co/400x250?text=${encodeURIComponent(brand.name)}`);
   const imagesToShow = productImages.length > 0 ? productImages : fallbackImages;
 
+  const isFlowForm = brand.urlSlug === 'flowform';
+
+  const displayPersonas: Persona[] = isFlowForm
+    ? [
+        {
+          personaId: 'demo_wfh_yoga_creative',
+          brandId: brand.brandId,
+          label: 'WFH Yoga Creative',
+          description:
+            'Remote designer or content creator in a small city apartment, using yoga and short flows to stay sane after long laptop days.',
+          tags: ['remote-work', 'yoga-first', 'small-apartment', 'creative'],
+        },
+        {
+          personaId: 'demo_midcareer_desk_worker',
+          brandId: brand.brandId,
+          label: 'Mid-Career Desk Worker with Stiff Back',
+          description:
+            '35–50 year old knowledge worker who sits in meetings all day and wants to fix a stiff back and tight hips with safer yoga and light strength.',
+          tags: ['desk-bound', 'back-pain', 'light-strength', 'posture'],
+        },
+        {
+          personaId: 'demo_beginner_runner_yoga',
+          brandId: brand.brandId,
+          label: 'Beginner Runner Who Loves Yoga',
+          description:
+            'Office worker training for a first 10K who already does yoga and wants running form to feel as aligned and mindful as mat practice.',
+          tags: ['beginner-runner', 'yoga-cross-training', 'injury-prevention'],
+        },
+        {
+          personaId: 'demo_young_parent_caregiver',
+          brandId: brand.brandId,
+          label: 'Young Parent or Caregiver Squeezing In Workouts',
+          description:
+            'Juggling kids, caregiving, and work; can only manage short sessions at home and wants each 10–20 minutes of yoga or strength to be safe and effective.',
+          tags: ['time-poor', 'home-workouts', 'efficiency', 'caregiver'],
+        },
+      ]
+    : personas;
+
+  const displayEnvironments: Environment[] = isFlowForm
+    ? [
+        {
+          environmentId: 'demo_nyc_apartment_yoga_corner',
+          brandId: brand.brandId,
+          label: 'NYC Apartment Yoga Corner',
+          description:
+            'A small New York City apartment living room with a yoga mat between the couch and coffee table, plants by the window, and just enough space to flow.',
+          tags: ['nyc-apartment', 'small-space', 'yoga', 'indoor'],
+        },
+        {
+          environmentId: 'demo_city_track_park_loop',
+          brandId: brand.brandId,
+          label: 'City Track and Park Loop',
+          description:
+            'An urban running track and nearby park loop in the city, with skyline views and mixed pavement and path surfaces for easy runs and form drills.',
+          tags: ['city-track', 'park-loop', 'running', 'outdoor'],
+        },
+        {
+          environmentId: 'demo_clinic_research_office',
+          brandId: brand.brandId,
+          label: 'Clinic or Research Office with Standing Desk',
+          description:
+            'A bright clinic or research office where a movement specialist uses a standing desk, screens with simple joint diagrams, and a mat for demonstrations.',
+          tags: ['clinic', 'research', 'standing-desk', 'demo-space'],
+        },
+        {
+          environmentId: 'demo_compact_home_strength_corner',
+          brandId: brand.brandId,
+          label: 'Compact Home Strength Corner',
+          description:
+            'A corner of a living room or garage with a mat, a few dumbbells, and a small rack—just enough space for squats, hinges, and simple strength circuits.',
+          tags: ['home-gym', 'strength-corner', 'compact', 'indoor'],
+        },
+      ]
+    : environments;
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -663,7 +784,7 @@ function BrandTab({ brand, personas, environments, cards, onImageClick, onUpload
 
       <h3 style={{ margin: '1rem 0 0.75rem 0' }}>Personas</h3>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        {personas.map((persona) => (
+        {displayPersonas.map((persona) => (
           <div key={persona.personaId} style={{ padding: '1rem', background: 'white', borderRadius: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
             <h4 style={{ margin: '0 0 0.5rem 0', color: '#007bff' }}>{persona.label}</h4>
             <p style={{ margin: '0 0 0.5rem 0', color: '#495057', fontSize: '0.95rem' }}>{persona.description}</p>
@@ -678,7 +799,7 @@ function BrandTab({ brand, personas, environments, cards, onImageClick, onUpload
 
       <h3 style={{ margin: '1rem 0 0.75rem 0' }}>Environments</h3>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
-        {environments.map(env => (
+        {displayEnvironments.map(env => (
           <div key={env.environmentId} style={{ padding: '1rem', background: 'white', borderRadius: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
             <h4 style={{ margin: '0 0 0.35rem 0', color: '#28a745' }}>{env.label}</h4>
             <p style={{ margin: 0, color: '#495057', fontSize: '0.95rem' }}>{env.description}</p>

@@ -1,0 +1,15 @@
+{
+  "id": "priya_nair",
+  "name": "Priya Nair",
+  "domain": "Mobility & Recovery",
+  "bio": "Fitness content creator specializing in mobility and injury prevention for everyday athletes and desk-bound professionals.",
+  "followers": 95000,
+  "engagement": 5.2,
+  "avgViews": 72000,
+  "platforms": ["IG", "YT", "TikTok"],
+  "semanticFit": 90,
+  "datasetDiversity": 90,
+  "partners": ["Alo Yoga", "Whoop"],
+  "competitors": ["Nike", "Garmin"]
+}
+

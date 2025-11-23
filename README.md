@@ -1,3 +1,8 @@
+<!-- Demo video -->
+[![Wisdom Pixels Demo](https://img.youtube.com/vi/CQqQXRbRwN4/hqdefault.jpg)](https://youtu.be/CQqQXRbRwN4)
+
+Direct link: https://youtu.be/CQqQXRbRwN4
+
 # Wisdom Pixels – Hackathon 2025 Demo
 
 ## Overview
