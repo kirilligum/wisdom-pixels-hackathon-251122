@@ -9,11 +9,43 @@ type TabType = 'personas' | 'environments' | 'influencers' | 'cards';
 export default function BrandDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('personas');
   const [data, setData] = useState<BrandData | null>(null);
+  const [influencerStates, setInfluencerStates] = useState<Record<string, { enabled: boolean; isDefault: boolean }>>({});
 
   useEffect(() => {
     // Load FlowForm data
-    setData(flowformData as BrandData);
+    const brandData = flowformData as BrandData;
+    setData(brandData);
+
+    // Initialize influencer states from seed data
+    const initialStates: Record<string, { enabled: boolean; isDefault: boolean }> = {};
+    brandData.influencers.forEach((inf) => {
+      initialStates[inf.id] = {
+        enabled: inf.enabled,
+        isDefault: inf.isDefault
+      };
+    });
+    setInfluencerStates(initialStates);
   }, []);
+
+  const handleToggleInfluencer = (influencerId: string) => {
+    setInfluencerStates(prev => ({
+      ...prev,
+      [influencerId]: {
+        ...prev[influencerId],
+        enabled: !prev[influencerId].enabled
+      }
+    }));
+  };
+
+  const handleSetDefault = (influencerId: string) => {
+    // Set all to non-default first, then set the selected one as default
+    const newStates = { ...influencerStates };
+    Object.keys(newStates).forEach(id => {
+      newStates[id] = { ...newStates[id], isDefault: false };
+    });
+    newStates[influencerId] = { ...newStates[influencerId], isDefault: true };
+    setInfluencerStates(newStates);
+  };
 
   if (!data) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
@@ -74,7 +106,12 @@ export default function BrandDashboard() {
           <EnvironmentsTab environments={data.environments} />
         )}
         {activeTab === 'influencers' && (
-          <InfluencersTab influencers={data.influencers} />
+          <InfluencersTab
+            influencers={data.influencers}
+            influencerStates={influencerStates}
+            onToggle={handleToggleInfluencer}
+            onSetDefault={handleSetDefault}
+          />
         )}
         {activeTab === 'cards' && (
           <CardGallery
@@ -181,47 +218,110 @@ function EnvironmentsTab({ environments }: { environments: Environment[] }) {
   );
 }
 
-function InfluencersTab({ influencers }: { influencers: any[] }) {
+function InfluencersTab({
+  influencers,
+  influencerStates,
+  onToggle,
+  onSetDefault
+}: {
+  influencers: any[];
+  influencerStates: Record<string, { enabled: boolean; isDefault: boolean }>;
+  onToggle: (id: string) => void;
+  onSetDefault: (id: string) => void;
+}) {
   return (
     <div>
       <h2 style={{ marginBottom: '1.5rem' }}>Influencer Profiles</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-        {influencers.map((influencer) => (
-          <div
-            key={influencer.id}
-            data-testid="influencer-card"
-            style={{
-              padding: '1.5rem',
-              background: 'white',
-              borderRadius: '8px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-          >
-            <h3 style={{ marginBottom: '0.5rem', color: '#6f42c1' }}>{influencer.name}</h3>
-            <p style={{ marginBottom: '0.5rem', color: '#6c757d', fontSize: '0.9rem' }}>
-              Age: {influencer.ageRange} • {influencer.role}
-            </p>
-            <p style={{ marginBottom: '1rem', color: '#495057', fontSize: '0.95rem' }}>
-              {influencer.bioShort}
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {influencer.tags.map((tag: string) => (
-                <span
-                  key={tag}
+        {influencers.map((influencer) => {
+          const state = influencerStates[influencer.id] || { enabled: false, isDefault: false };
+          return (
+            <div
+              key={influencer.id}
+              data-testid="influencer-card"
+              style={{
+                padding: '1.5rem',
+                background: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                opacity: state.enabled ? 1 : 0.6
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                <h3 style={{ margin: 0, color: '#6f42c1' }}>{influencer.name}</h3>
+                {state.isDefault && (
+                  <span
+                    data-testid="default-indicator"
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      background: '#ffc107',
+                      color: '#000',
+                      borderRadius: '4px',
+                      fontSize: '0.7rem',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Default
+                  </span>
+                )}
+              </div>
+              <p style={{ marginBottom: '0.5rem', color: '#6c757d', fontSize: '0.9rem' }}>
+                Age: {influencer.ageRange} • {influencer.role}
+              </p>
+              <p style={{ marginBottom: '1rem', color: '#495057', fontSize: '0.95rem' }}>
+                {influencer.bioShort}
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                {influencer.tags.map((tag: string) => (
+                  <span
+                    key={tag}
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      background: '#f3e5ff',
+                      color: '#6f42c1',
+                      borderRadius: '12px',
+                      fontSize: '0.85rem'
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+
+              {/* Controls */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    data-testid="enable-toggle"
+                    checked={state.enabled}
+                    onChange={() => onToggle(influencer.id)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '0.9rem', color: '#495057' }}>Enabled</span>
+                </label>
+                <button
+                  data-testid="set-default-button"
+                  onClick={() => onSetDefault(influencer.id)}
+                  disabled={state.isDefault}
                   style={{
-                    padding: '0.25rem 0.75rem',
-                    background: '#f3e5ff',
-                    color: '#6f42c1',
-                    borderRadius: '12px',
-                    fontSize: '0.85rem'
+                    padding: '0.5rem 1rem',
+                    background: state.isDefault ? '#6c757d' : '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: state.isDefault ? 'not-allowed' : 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                    opacity: state.isDefault ? 0.6 : 1
                   }}
                 >
-                  {tag}
-                </span>
-              ))}
+                  {state.isDefault ? 'Default' : 'Set Default'}
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
