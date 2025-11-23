@@ -5,8 +5,6 @@ export default function ImageGeneratorTab({ brandName }: { brandName: string }) 
   const [generatedImages, setGeneratedImages] = useState<Array<{ url: string; prompt: string; timestamp: number }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKeyInput, setShowApiKeyInput] = useState(true);
 
   const examplePrompts = [
     'Professional athlete wearing high-tech motion tracking suit, studio photography, clean background',
@@ -21,8 +19,11 @@ export default function ImageGeneratorTab({ brandName }: { brandName: string }) 
       return;
     }
 
-    if (!apiKey.trim()) {
-      setError('Please enter your FAL_KEY. Get one at fal.ai');
+    // Get API key from environment variable
+    const apiKey = import.meta.env.VITE_FALAI_API_KEY || import.meta.env.VITE_FAL_KEY;
+
+    if (!apiKey) {
+      setError('FAL API key not configured. Please add VITE_FALAI_API_KEY to your .env file.');
       return;
     }
 
@@ -32,7 +33,7 @@ export default function ImageGeneratorTab({ brandName }: { brandName: string }) 
     try {
       const { fal } = await import('@fal-ai/client');
 
-      // Configure fal client with API key
+      // Configure fal client with API key from environment
       fal.config({
         credentials: apiKey
       });
@@ -76,70 +77,6 @@ export default function ImageGeneratorTab({ brandName }: { brandName: string }) 
       <p style={{ color: '#6c757d', marginBottom: '1.5rem' }}>
         Create stunning product images for {brandName} using AI-powered image generation
       </p>
-
-      {showApiKeyInput && (
-        <div style={{
-          background: '#fff3cd',
-          padding: '1rem',
-          borderRadius: '8px',
-          marginBottom: '1.5rem',
-          border: '1px solid #ffc107'
-        }}>
-          <h4 style={{ margin: '0 0 0.5rem 0', color: '#856404' }}>Setup Required</h4>
-          <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#856404' }}>
-            You need a FAL API key to generate images. Get one free at <a href="https://fal.ai" target="_blank" rel="noopener noreferrer" style={{ color: '#007bff' }}>fal.ai</a>
-          </p>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="Enter your FAL_KEY here"
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #ced4da',
-              borderRadius: '4px',
-              fontSize: '1rem',
-              marginBottom: '0.5rem'
-            }}
-          />
-          <button
-            onClick={() => setShowApiKeyInput(false)}
-            disabled={!apiKey.trim()}
-            style={{
-              padding: '0.5rem 1rem',
-              background: apiKey.trim() ? '#28a745' : '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: apiKey.trim() ? 'pointer' : 'not-allowed',
-              fontSize: '0.9rem'
-            }}
-          >
-            Save API Key
-          </button>
-        </div>
-      )}
-
-      {!showApiKeyInput && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <button
-            onClick={() => setShowApiKeyInput(true)}
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              marginBottom: '1rem'
-            }}
-          >
-            Change API Key
-          </button>
-        </div>
-      )}
 
       {/* Example Prompts */}
       <div style={{ marginBottom: '1.5rem' }}>
@@ -200,15 +137,15 @@ export default function ImageGeneratorTab({ brandName }: { brandName: string }) 
 
         <button
           onClick={handleGenerate}
-          disabled={isGenerating || !prompt.trim() || !apiKey.trim()}
+          disabled={isGenerating || !prompt.trim()}
           style={{
             marginTop: '1rem',
             padding: '0.75rem 2rem',
-            background: isGenerating || !prompt.trim() || !apiKey.trim() ? '#6c757d' : '#007bff',
+            background: isGenerating || !prompt.trim() ? '#6c757d' : '#007bff',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: isGenerating || !prompt.trim() || !apiKey.trim() ? 'not-allowed' : 'pointer',
+            cursor: isGenerating || !prompt.trim() ? 'not-allowed' : 'pointer',
             fontSize: '1rem',
             fontWeight: 'bold'
           }}

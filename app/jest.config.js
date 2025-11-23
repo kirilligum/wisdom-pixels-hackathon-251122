@@ -1,11 +1,13 @@
 export default {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/src'],
+  roots: ['<rootDir>/src', '<rootDir>/tests', '<rootDir>/mastra'],
   testMatch: ['**/__tests__/**/*.test.ts', '**/?(*.)+(spec|test).ts'],
+  testPathIgnorePatterns: ['/node_modules/', '\\.spec\\.ts$'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
+    'mastra/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
     '!src/main.tsx',
   ],
@@ -20,4 +22,7 @@ export default {
       },
     }],
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(@sindresorhus|escape-string-regexp|@mastra)/)',
+  ],
 };
