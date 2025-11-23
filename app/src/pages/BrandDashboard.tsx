@@ -4,12 +4,14 @@ import type { BrandData, Persona, Environment } from '../types';
 import flowformData from '../data/flowform-seed.json';
 import CardGallery from '../components/CardGallery';
 
-type TabType = 'personas' | 'environments' | 'influencers' | 'cards';
+type TabType = 'personas' | 'environments' | 'influencers' | 'cards' | 'publish';
 
 export default function BrandDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('personas');
   const [data, setData] = useState<BrandData | null>(null);
   const [influencerStates, setInfluencerStates] = useState<Record<string, { enabled: boolean; isDefault: boolean }>>({});
+  const [cardStatuses, setCardStatuses] = useState<Record<string, 'draft' | 'ready' | 'published'>>({});
+  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Load FlowForm data
@@ -25,6 +27,13 @@ export default function BrandDashboard() {
       };
     });
     setInfluencerStates(initialStates);
+
+    // Initialize card statuses from seed data
+    const initialCardStatuses: Record<string, 'draft' | 'ready' | 'published'> = {};
+    brandData.cards.forEach((card) => {
+      initialCardStatuses[card.id] = card.status;
+    });
+    setCardStatuses(initialCardStatuses);
   }, []);
 
   const handleToggleInfluencer = (influencerId: string) => {
@@ -45,6 +54,27 @@ export default function BrandDashboard() {
     });
     newStates[influencerId] = { ...newStates[influencerId], isDefault: true };
     setInfluencerStates(newStates);
+  };
+
+  const handleToggleCardSelection = (cardId: string) => {
+    setSelectedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId);
+      } else {
+        newSet.add(cardId);
+      }
+      return newSet;
+    });
+  };
+
+  const handlePublishSelected = () => {
+    const newStatuses = { ...cardStatuses };
+    selectedCards.forEach(cardId => {
+      newStatuses[cardId] = 'published';
+    });
+    setCardStatuses(newStatuses);
+    setSelectedCards(new Set()); // Clear selection after publishing
   };
 
   if (!data) {
@@ -95,6 +125,12 @@ export default function BrandDashboard() {
         >
           Cards
         </button>
+        <button
+          onClick={() => setActiveTab('publish')}
+          style={tabStyle(activeTab === 'publish')}
+        >
+          Publish
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -118,6 +154,15 @@ export default function BrandDashboard() {
             cards={data.cards}
             influencers={data.influencers}
             personas={data.personas}
+          />
+        )}
+        {activeTab === 'publish' && (
+          <PublishTab
+            cards={data.cards}
+            cardStatuses={cardStatuses}
+            selectedCards={selectedCards}
+            onToggleSelection={handleToggleCardSelection}
+            onPublish={handlePublishSelected}
           />
         )}
       </div>
@@ -319,6 +364,114 @@ function InfluencersTab({
                   {state.isDefault ? 'Default' : 'Set Default'}
                 </button>
               </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PublishTab({
+  cards,
+  cardStatuses,
+  selectedCards,
+  onToggleSelection,
+  onPublish
+}: {
+  cards: any[];
+  cardStatuses: Record<string, 'draft' | 'ready' | 'published'>;
+  selectedCards: Set<string>;
+  onToggleSelection: (id: string) => void;
+  onPublish: () => void;
+}) {
+  const publishedCount = Object.values(cardStatuses).filter(status => status === 'published').length;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2 style={{ margin: 0 }}>Publish Cards</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <span style={{ color: '#6c757d' }}>{publishedCount} published</span>
+          <button
+            data-testid="publish-button"
+            onClick={onPublish}
+            disabled={selectedCards.size === 0}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: selectedCards.size > 0 ? '#28a745' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: selectedCards.size > 0 ? 'pointer' : 'not-allowed',
+              fontSize: '1rem',
+              fontWeight: 'bold'
+            }}
+          >
+            Publish Selected ({selectedCards.size})
+          </button>
+        </div>
+      </div>
+
+      <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden' }}>
+        {cards.map(card => {
+          const status = cardStatuses[card.id] || 'draft';
+          const isSelected = selectedCards.has(card.id);
+
+          return (
+            <div
+              key={card.id}
+              data-testid="publish-card-item"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '1rem',
+                borderBottom: '1px solid #e9ecef',
+                background: isSelected ? '#f0f8ff' : 'white'
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => onToggleSelection(card.id)}
+                style={{ marginRight: '1rem', cursor: 'pointer', width: '18px', height: '18px' }}
+              />
+
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                  {card.id}
+                </div>
+                <div style={{ fontSize: '0.9rem', color: '#6c757d', marginBottom: '0.25rem' }}>
+                  {card.query.substring(0, 80)}...
+                </div>
+                {status === 'published' && (
+                  <div
+                    data-testid="card-url"
+                    style={{
+                      fontSize: '0.85rem',
+                      color: '#007bff',
+                      fontFamily: 'monospace'
+                    }}
+                  >
+                    {card.url}
+                  </div>
+                )}
+              </div>
+
+              <span
+                data-testid="card-status"
+                style={{
+                  padding: '0.25rem 0.75rem',
+                  background: status === 'published' ? '#d4edda' : status === 'ready' ? '#fff3cd' : '#f8d7da',
+                  color: status === 'published' ? '#155724' : status === 'ready' ? '#856404' : '#721c24',
+                  borderRadius: '12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 'bold',
+                  textTransform: 'capitalize'
+                }}
+              >
+                {status}
+              </span>
             </div>
           );
         })}
