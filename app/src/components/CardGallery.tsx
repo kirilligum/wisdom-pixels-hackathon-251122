@@ -109,21 +109,16 @@ export default function CardGallery({ cards, influencers, personas }: CardGaller
               e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
             }}
           >
-            <div
-              data-testid="card-image"
-              style={{
-                width: '100%',
-                height: '200px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '3rem',
-                fontWeight: 'bold'
-              }}
-            >
-              {card.cardId && card.cardId.includes('_') ? card.cardId.split('_')[1] : card.cardId}
+            <div data-testid="card-image" style={{ width: '100%', height: '200px', position: 'relative', background: '#f1f3f5' }}>
+              <img
+                src={card.imageUrl}
+                alt={card.imageBrief || card.query}
+                onError={(e) => { e.currentTarget.src = `https://placehold.co/400x250?text=${encodeURIComponent(card.query)}`; }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0.5rem', background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%)', color: 'white', fontSize: '0.85rem' }}>
+                {card.imageBrief}
+              </div>
             </div>
 
             <div style={{ padding: '1rem' }}>

@@ -7,6 +7,7 @@ export interface Brand {
   brandId: string;
   name: string;
   domain: string;
+  description?: string | null;
   contentSources: string[]; // URLs or text references
   urlSlug?: string;
 }
@@ -33,6 +34,7 @@ export interface Influencer {
   bio: string;
   domain: string;
   imageUrl: string;
+  actionImageUrls?: string[];
   enabled: boolean;
 }
 

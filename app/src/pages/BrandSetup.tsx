@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiClient } from '../lib/api-client';
 
 export default function BrandSetup() {
@@ -134,11 +134,11 @@ export default function BrandSetup() {
         >
           {isAnalyzing ? 'Analyzing content...' : 'Analyze Content'}
         </button>
-      </form>
+    </form>
 
-      {isAnalyzing && (
-        <div style={{
-          marginTop: '1.5rem',
+    {isAnalyzing && (
+      <div style={{
+        marginTop: '1.5rem',
           padding: '1rem',
           background: '#e7f3ff',
           borderRadius: '4px',
@@ -161,6 +161,18 @@ export default function BrandSetup() {
           {error}
         </div>
       )}
+
+      <div style={{ marginTop: '1.5rem' }}>
+        <Link to="/" style={{
+          padding: '0.5rem 1rem',
+          background: '#6c757d',
+          color: 'white',
+          textDecoration: 'none',
+          borderRadius: '4px'
+        }}>
+          Back to Home
+        </Link>
+      </div>
     </div>
   );
 }

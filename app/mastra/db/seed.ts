@@ -5,6 +5,20 @@ import {
   influencersRepo,
   cardsRepo,
 } from './repositories';
+import { generateActionImages, generateInfluencerImage } from './image-generation';
+
+async function createInfluencerWithImages(data: { name: string; bio: string; domain: string; enabled?: boolean }) {
+  const headshot = await generateInfluencerImage(data.name, data.domain);
+  const actionImageUrls = await generateActionImages(headshot, data.name, data.domain);
+  const safeActionImages = actionImageUrls && actionImageUrls.length >= 2 ? actionImageUrls : [headshot, headshot];
+
+  return influencersRepo.create({
+    ...data,
+    enabled: data.enabled ?? true,
+    imageUrl: headshot,
+    actionImageUrls: safeActionImages,
+  });
+}
 
 /**
  * Seed database with FlowForm brand data
@@ -16,6 +30,14 @@ async function seed() {
   try {
     // 1. Create FlowForm brand
     console.log('\n📦 Creating FlowForm brand...');
+
+    // If a FlowForm brand already exists, remove it for idempotent seed
+    const existing = await brandsRepo.findBySlug('flowform');
+    if (existing) {
+      console.log(`Found existing FlowForm brand (${existing.brandId}), deleting for fresh seed...`);
+      await brandsRepo.delete(existing.brandId);
+    }
+
     const brand = await brandsRepo.create({
       name: 'FlowForm',
       domain: 'Project Management SaaS',
@@ -92,43 +114,23 @@ async function seed() {
     // 4. Create 5+ influencers
     console.log('\n⭐ Creating influencers...');
     const influencers = await Promise.all([
-      influencersRepo.create({
+      createInfluencerWithImages({
         name: 'Sarah Chen',
         bio: 'Tech entrepreneur and productivity expert with 15 years of experience building successful SaaS products.',
         domain: 'SaaS & Productivity',
-        imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-        enabled: true,
       }),
-      influencersRepo.create({
+      createInfluencerWithImages({
         name: 'Marcus Johnson',
         bio: 'Former Fortune 500 project manager turned business consultant, helping companies optimize workflows.',
         domain: 'Project Management',
-        imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-        enabled: true,
       }),
-      influencersRepo.create({
+      createInfluencerWithImages({
         name: 'Dr. Emily Rodriguez',
         bio: 'Organizational psychologist specializing in team dynamics and remote work effectiveness.',
         domain: 'Team Psychology',
-        imageUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400',
-        enabled: true,
-      }),
-      influencersRepo.create({
-        name: 'Alex Tanaka',
-        bio: 'Serial entrepreneur and startup advisor, founder of three successful tech companies.',
-        domain: 'Startups & Growth',
-        imageUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
-        enabled: true,
-      }),
-      influencersRepo.create({
-        name: 'Lisa Williams',
-        bio: 'Digital transformation expert helping enterprises adopt modern collaboration tools.',
-        domain: 'Enterprise Tech',
-        imageUrl: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=400',
-        enabled: true,
       }),
     ]);
-    console.log(`✅ Created ${influencers.length} influencers`);
+    console.log(`✅ Created ${influencers.length} influencers (demo set)`);
 
     // 5. Create sample cards (20 total)
     console.log('\n🎴 Creating sample cards...');
@@ -168,28 +170,6 @@ async function seed() {
         imageBrief: 'Asian entrepreneur working in trendy coffee shop with laptop showing FlowForm startup dashboard, coffee and notebook nearby, natural lighting',
         status: 'published',
         publishedAt: new Date(),
-      }),
-      cardsRepo.create({
-        brandId: brand.brandId,
-        influencerId: influencers[3].influencerId,
-        personaId: personas[3].personaId,
-        environmentId: environments[3].environmentId,
-        query: 'Can FlowForm handle multiple client projects simultaneously?',
-        response: 'Alex Tanaka manages over 20 client projects using FlowForm. The multi-workspace feature and client portal make it perfect for consultants juggling various engagements.',
-        imageUrl: 'https://placeholder-image.com/flowform-card-4.jpg',
-        imageBrief: 'Professional person presenting FlowForm project overview in conference room with multiple client workspaces visible on large screen, engaged audience',
-        status: 'draft',
-      }),
-      cardsRepo.create({
-        brandId: brand.brandId,
-        influencerId: influencers[4].influencerId,
-        personaId: personas[0].personaId,
-        environmentId: environments[0].environmentId,
-        query: 'How does FlowForm integrate with existing enterprise tools?',
-        response: 'Lisa Williams has helped Fortune 500 companies adopt FlowForm seamlessly. With 50+ integrations including Slack, Microsoft Teams, and Salesforce, it fits right into your existing workflow.',
-        imageUrl: 'https://placeholder-image.com/flowform-card-5.jpg',
-        imageBrief: 'Professional woman in corporate office demonstrating FlowForm enterprise integrations on multiple monitors, showing connected tools and workflows',
-        status: 'draft',
       }),
     ];
 
@@ -236,10 +216,12 @@ async function seed() {
 
 export { seed };
 
-// Run seed if executed directly
-seed()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+// Only run when executed directly (not on import)
+if (process.argv[1]?.includes('seed.ts')) {
+  seed()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
+}

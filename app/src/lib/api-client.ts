@@ -1,6 +1,6 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-type HttpMethod = 'GET' | 'POST';
+type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 async function request<T>(path: string, method: HttpMethod = 'GET', body?: any): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -51,6 +51,7 @@ export type Influencer = {
   bio: string;
   domain: string;
   imageUrl: string;
+  actionImageUrls?: string[];
   enabled: boolean;
 };
 
@@ -99,6 +100,13 @@ export const apiClient = {
   getCard: (cardId: string) => request<{ card: Card }>(`/api/cards/${cardId}`),
 
   getInfluencers: () => request<{ influencers: Influencer[] }>(`/api/influencers`),
+  getInfluencerGallery: (influencerId: string) => request<{ headshot: string; actionImages: string[] }>(`/api/influencers/${influencerId}/gallery`),
+
+  updateInfluencerEnabled: (influencerId: string, enabled: boolean) =>
+    request<{ influencer: Influencer }>(`/api/influencers/${influencerId}/enabled`, 'PATCH', { enabled }),
+
+  findNewInfluencers: () => request<{ influencers: Influencer[] }>(`/api/influencers/find-new`, 'POST'),
+  deleteInfluencer: (influencerId: string) => request<{}>(`/api/influencers/${influencerId}`, 'DELETE'),
 
   generateCards: (brandId: string) =>
     request<WorkflowRunResponse>(`/api/brands/${brandId}/cards/generate`, 'POST', {}),

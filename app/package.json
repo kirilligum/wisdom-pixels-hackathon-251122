@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:mastra": "mastra dev --dir mastra",
-    "dev:api": "tsx api/index.ts",
+    "dev:api": "tsx watch api/index.ts",
     "build": "tsc -b && vite build",
     "build:mastra": "mastra build --dir mastra",
     "lint": "eslint .",
@@ -27,8 +27,10 @@
   },
   "dependencies": {
     "@fal-ai/client": "^1.7.2",
+    "@hono/node-server": "^1.19.6",
     "@mastra/client-js": "^0.16.14",
     "@mastra/core": "^0.24.5",
+    "hono": "^4.10.6",
     "mastra": "^0.18.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

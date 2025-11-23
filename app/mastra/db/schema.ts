@@ -52,6 +52,7 @@ export const influencers = sqliteTable('influencers', {
   bio: text('bio').notNull(),
   domain: text('domain').notNull(),
   imageUrl: text('image_url').notNull(),
+  actionImageUrls: text('action_image_urls', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });

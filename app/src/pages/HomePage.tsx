@@ -11,8 +11,14 @@ export default function HomePage() {
       try {
         const { brand } = await apiClient.getBrandBySlug('flowform');
         setFlowFormId(brand.brandId);
-      } catch (e) {
-        setFlowFormId(null);
+      } catch {
+        try {
+          const list = await apiClient.listBrands();
+          const flow = list.brands?.find((b) => b.urlSlug === 'flowform');
+          setFlowFormId(flow?.brandId || null);
+        } catch {
+          setFlowFormId(null);
+        }
       } finally {
         setLoading(false);
       }
