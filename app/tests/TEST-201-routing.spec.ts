@@ -20,7 +20,7 @@ test.describe('TEST-201: Basic routing', () => {
     await page.goto('/brand/flowform');
 
     // Check for FlowForm brand heading
-    await expect(page.locator('h1')).toContainText('FlowForm Brand Dashboard');
+    await expect(page.locator('h1')).toContainText('FlowForm Motion Suit');
 
     // Check for back link
     const homeLink = page.locator('a[href="/"]');
@@ -28,11 +28,11 @@ test.describe('TEST-201: Basic routing', () => {
   });
 
   test('should load card detail at /cards/:id', async ({ page }) => {
-    const testCardId = 'test-card-123';
+    const testCardId = 'card_001'; // Use actual card ID from seed data
     await page.goto(`/cards/${testCardId}`);
 
-    // Check for Card Detail heading
-    await expect(page.locator('h1')).toContainText('Card Detail');
+    // Check for Card Detail heading (note: plural "Details")
+    await expect(page.locator('h1')).toContainText('Card Details');
 
     // Check that card ID is displayed
     await expect(page.getByText(`Card ID: ${testCardId}`)).toBeVisible();
@@ -49,7 +49,7 @@ test.describe('TEST-201: Basic routing', () => {
     // Navigate to brand dashboard
     await page.click('a[href="/brand/flowform"]');
     await expect(page).toHaveURL('/brand/flowform');
-    await expect(page.locator('h1')).toContainText('FlowForm Brand Dashboard');
+    await expect(page.locator('h1')).toContainText('FlowForm Motion Suit');
 
     // Navigate back home
     await page.click('a[href="/"]');

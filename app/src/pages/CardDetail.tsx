@@ -10,6 +10,7 @@ export default function CardDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedQuery, setEditedQuery] = useState('');
   const [editedResponse, setEditedResponse] = useState('');
+  const [viewCount, setViewCount] = useState(0);
 
   useEffect(() => {
     // Load FlowForm data
@@ -22,6 +23,13 @@ export default function CardDetail() {
       setCard(foundCard);
       setEditedQuery(foundCard.query);
       setEditedResponse(foundCard.response);
+
+      // Increment view count (telemetry)
+      const viewKey = `card_views_${id}`;
+      const currentViews = parseInt(localStorage.getItem(viewKey) || '0', 10);
+      const newViews = currentViews + 1;
+      localStorage.setItem(viewKey, newViews.toString());
+      setViewCount(newViews);
     }
   }, [id]);
 
@@ -67,8 +75,22 @@ export default function CardDetail() {
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ marginBottom: '0.5rem' }}>Card Details</h1>
-        <div data-testid="card-id" style={{ color: '#6c757d', fontSize: '0.95rem' }}>
-          Card ID: {card.id}
+        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+          <div data-testid="card-id" style={{ color: '#6c757d', fontSize: '0.95rem' }}>
+            Card ID: {card.id}
+          </div>
+          <div
+            data-testid="view-count"
+            style={{
+              color: '#6c757d',
+              fontSize: '0.9rem',
+              padding: '0.25rem 0.75rem',
+              background: '#e9ecef',
+              borderRadius: '12px'
+            }}
+          >
+            {viewCount} {viewCount === 1 ? 'view' : 'views'}
+          </div>
         </div>
       </div>
 
