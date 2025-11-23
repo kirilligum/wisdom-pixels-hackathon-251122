@@ -132,50 +132,12 @@ Entry: `api/index.ts` (served by `tsx watch api/index.ts`):
 
 ```mermaid
 flowchart LR
-  subgraph UserSide[Brand Side]
-    U[Brand marketer / growth lead]
-  end
-
-  subgraph Frontend[React Frontend]
-    UI[Brand Dashboard<br/>Product, Influencers, Cards]
-  end
-
-  subgraph APILayer[Hono API]
-    API[REST API<br/>/api/brands, /api/influencers,<br/>/api/cards, /api/content]
-  end
-
-  subgraph MastraApp[Mastra App]
-    Agent[Content Agent<br/>personas, envs, training cards]
-    WF[Workflows<br/>BrandOnboarding, CardGeneration, Publishing]
-  end
-
-  subgraph DataLayer[Data & Models]
-    DB[(SQLite DB<br/>brands, personas,<br/>environments, influencers,<br/>cards, workflow_runs)]
-    Fal[fal.ai Alpha Image 232<br/>(edit-image)]
-  end
-
-  subgraph DatasetExport[AI Training Dataset]
-    DS[Wisdom Cards JSONL<br/>query, answer, imageUrl]
-  end
-
-  U -->|"Paste landing page URLs<br/>configure product"| UI
-  UI -->|"Brand setup<br/>card actions"| API
-
-  API -->|"BrandOnboardingWorkflow"| WF
-  WF --> Agent
-  Agent -->|"Personas, environments<br/>value props"| DB
-
-  API -->|"Find New influencer<br/>get gallery"| DB
-  API -->|"generate gallery<br/>(edit-image)"| Fal
-  Fal -->|"image URLs"| DB
-
-  API -->|"CardGenerationWorkflow"| WF
-  WF --> Agent
-  Agent -->|"Wisdom Cards<br/>(query, answer, imageUrl)"| DB
-
-  DB -->|"/api/brands/:id/cards"| API --> UI
-
-  DB -->|"export cards<br/>as JSONL"| DS
+  U[Brand marketer] --> UI[Brand Dashboard]
+  UI --> API[Hono API]
+  API --> Mastra[Mastra agents & workflows]
+  Mastra --> DB[(SQLite DB)]
+  API --> Fal[fal.ai image generation]
+  DB --> DS[Wisdom Cards dataset]
 ```
 
 **How a brand creates a dataset for its product**
