@@ -22,9 +22,13 @@ describe('Phase M3: Specialized Agents', () => {
     });
 
     test('TEST-M3-102: Should use correct model', () => {
+      const hasAnthropic = process.env.ANTHROPIC_API_KEY;
       const hasOpenAI = process.env.OPENAI_API_KEY;
-      if (hasOpenAI) {
-        expect(contentAnalysisAgent.model).toBe('openai/gpt-5-nano-2025-08-07');
+
+      if (hasAnthropic) {
+        expect(contentAnalysisAgent.model).toBe('anthropic/claude-haiku-4-5');
+      } else if (hasOpenAI) {
+        expect(contentAnalysisAgent.model).toBe('openai/gpt-4o-mini');
       } else {
         expect(contentAnalysisAgent.model).toBe('anthropic/claude-haiku-4-5');
       }

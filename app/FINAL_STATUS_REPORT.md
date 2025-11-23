@@ -37,7 +37,7 @@ Successfully completed Phases M1-M5 and made significant progress on M6-M8. The 
 - ✅ CardAnswerAgent - Generate influencer responses
 - ✅ SafetyAgent - Content safety review
 - ✅ ImageBriefAgent - FLUX prompt generation
-- ✅ All agents use updated model configuration (gpt-5-nano-2025-08-07 / claude-haiku-4-5)
+- ✅ All agents use updated model configuration (claude-haiku-4-5 default, gpt-4o-mini fallback)
 - ✅ **Tests**: 18/18 passing
 
 ### Phase M4: Workflows (100%)
@@ -93,7 +93,8 @@ Successfully completed Phases M1-M5 and made significant progress on M6-M8. The 
 
 ### Model Configuration
 - ✅ Updated all agents to use latest models:
-  - OpenAI: `gpt-5-nano-2025-08-07`
+  - Anthropic (default): `claude-haiku-4-5`
+  - OpenAI (fallback): `gpt-4o-mini`
   - Anthropic: `claude-haiku-4-5`
 - ✅ String format model IDs (`"openai/..."` instead of object)
 - ✅ Conditional model selection based on API keys

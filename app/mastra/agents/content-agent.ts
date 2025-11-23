@@ -17,9 +17,11 @@ export const contentAgent = new Agent({
 
     Use the available tools to generate structured content for personas, environments, and training cards.
   `,
-  model: process.env.OPENAI_API_KEY
-    ? "openai/gpt-5-nano-2025-08-07"
-    : "anthropic/claude-haiku-4-5",
+  model: process.env.ANTHROPIC_API_KEY
+    ? "anthropic/claude-haiku-4-5"
+    : process.env.OPENAI_API_KEY
+      ? "openai/gpt-4o-mini"
+      : "anthropic/claude-haiku-4-5",
   tools: {
     generatePersonaTool,
     generateEnvironmentTool,
