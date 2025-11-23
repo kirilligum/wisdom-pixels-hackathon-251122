@@ -105,6 +105,24 @@ describe('Phase M5: REST API', () => {
         res.status(500).json({ error: 'Internal server error' });
       }
     });
+
+    // Upload product image (replace)
+    app.post('/api/brands/:brandId/images', async (req, res) => {
+      try {
+        const url = req.body?.url;
+        if (!url || typeof url !== 'string') {
+          return res.status(400).json({ error: 'url is required' });
+        }
+        const brand = await brandsRepo.findById(req.params.brandId);
+        if (!brand) {
+          return res.status(404).json({ error: 'Brand not found' });
+        }
+        const updated = await brandsRepo.update(req.params.brandId, { productImages: [url] });
+        res.json({ brand: updated });
+      } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
   });
 
   describe('Health Check', () => {
@@ -231,6 +249,31 @@ describe('Phase M5: REST API', () => {
       expect(response.status).toBe(200);
       expect(response.body.cards).toBeDefined();
       expect(response.body.cards.length).toBeGreaterThanOrEqual(2);
+    });
+
+    test('TEST-M5-206: POST /api/brands/:brandId/images should overwrite product image', async () => {
+      const brand = await brandsRepo.create({
+        name: 'Test Brand Upload',
+        domain: 'Domain',
+        urlSlug: `test-brand-upload-${Date.now()}`,
+        contentSources: [],
+      });
+
+      // first upload
+      let response = await request(app)
+        .post(`/api/brands/${brand.brandId}/images`)
+        .send({ url: 'data:image/png;base64,AAA' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.brand.productImages).toEqual(['data:image/png;base64,AAA']);
+
+      // second upload should replace the first
+      response = await request(app)
+        .post(`/api/brands/${brand.brandId}/images`)
+        .send({ url: 'data:image/png;base64,BBB' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.brand.productImages).toEqual(['data:image/png;base64,BBB']);
     });
   });
 

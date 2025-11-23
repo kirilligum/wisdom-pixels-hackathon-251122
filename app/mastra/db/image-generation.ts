@@ -5,6 +5,7 @@ export async function generateInfluencerImage(name: string, domain: string): Pro
   if (!falKey) return placeholder;
 
   try {
+    console.log(`[image-gen] headshot start for ${name} (${domain})`);
     const { fal } = await import('@fal-ai/client');
     fal.config({ credentials: falKey });
 
@@ -15,7 +16,9 @@ export async function generateInfluencerImage(name: string, domain: string): Pro
       logs: false,
     });
 
-    return result?.data?.images?.[0]?.url || placeholder;
+    const url = result?.data?.images?.[0]?.url || placeholder;
+    console.log(`[image-gen] headshot done for ${name}: ${url}`);
+    return url;
   } catch (e) {
     console.error('Image generation failed, using placeholder:', e);
     return placeholder;
@@ -28,6 +31,7 @@ export async function generateActionImages(headshotUrl: string, name: string, do
   if (!falKey) return [placeholder, placeholder];
 
   try {
+    console.log(`[image-gen] action start for ${name}`);
     const { fal } = await import('@fal-ai/client');
     fal.config({ credentials: falKey });
 
@@ -39,6 +43,7 @@ export async function generateActionImages(headshotUrl: string, name: string, do
     const results: string[] = [];
     for (const prompt of prompts) {
       try {
+        console.log(`[image-gen] edit-image call for ${name} prompt: ${prompt}`);
         const resp: any = await fal.subscribe('fal-ai/alpha-image-232/edit-image', {
           input: {
             prompt,
@@ -47,9 +52,11 @@ export async function generateActionImages(headshotUrl: string, name: string, do
           logs: false,
         });
         const url = resp?.data?.images?.[0]?.url;
+        console.log(`[image-gen] edit-image success for ${name}: ${url}`);
         results.push(url || placeholder);
       } catch {
         // If edit-image fails, keep the face reference by falling back to the headshot
+        console.warn(`[image-gen] edit-image failed for ${name}, using headshot fallback`);
         results.push(headshotUrl || placeholder);
       }
     }

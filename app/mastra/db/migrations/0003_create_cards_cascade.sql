@@ -1,0 +1,20 @@
+CREATE TABLE `cards` (
+  `card_id` text PRIMARY KEY NOT NULL,
+  `brand_id` text NOT NULL,
+  `influencer_id` text NOT NULL,
+  `persona_id` text,
+  `environment_id` text,
+  `query` text NOT NULL,
+  `response` text NOT NULL,
+  `image_url` text NOT NULL,
+  `image_brief` text NOT NULL,
+  `status` text DEFAULT 'draft' NOT NULL,
+  `view_count` integer DEFAULT 0 NOT NULL,
+  `share_count` integer DEFAULT 0 NOT NULL,
+  `created_at` integer DEFAULT (unixepoch()) NOT NULL,
+  `published_at` integer,
+  FOREIGN KEY (`brand_id`) REFERENCES `brands`(`brand_id`) ON DELETE cascade,
+  FOREIGN KEY (`influencer_id`) REFERENCES `influencers`(`influencer_id`) ON DELETE cascade,
+  FOREIGN KEY (`persona_id`) REFERENCES `personas`(`persona_id`),
+  FOREIGN KEY (`environment_id`) REFERENCES `environments`(`environment_id`)
+);

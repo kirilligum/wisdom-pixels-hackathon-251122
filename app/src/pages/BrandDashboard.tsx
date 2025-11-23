@@ -6,7 +6,7 @@ import ImageGeneratorTab from '../components/ImageGeneratorTab';
 import ContentGeneratorTab from '../components/ContentGeneratorTab';
 import { apiClient } from '../lib/api-client';
 
-type TabType = 'brand' | 'influencers' | 'cards' | 'publish' | 'images' | 'ai-content';
+type TabType = 'product' | 'influencers' | 'cards' | 'publish' | 'images' | 'ai-content';
 
 const MetricPill = ({ label, value }: { label: string; value: string }) => (
   <div style={{ padding: '0.35rem 0.75rem', background: '#e9ecef', borderRadius: '12px', fontSize: '0.85rem', color: '#495057', border: '1px solid #dee2e6' }}>
@@ -17,7 +17,7 @@ const MetricPill = ({ label, value }: { label: string; value: string }) => (
 export default function BrandDashboard() {
   const { brandId } = useParams<{ brandId: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('brand');
+  const [activeTab, setActiveTab] = useState<TabType>('product');
   const [data, setData] = useState<BrandData | null>(null);
   const [influencerStates, setInfluencerStates] = useState<Record<string, { enabled: boolean; isDefault: boolean }>>({});
   const [cardStatuses, setCardStatuses] = useState<Record<string, 'draft' | 'ready' | 'published'>>({});
@@ -30,6 +30,8 @@ export default function BrandDashboard() {
   const [gallery, setGallery] = useState<{ headshot: string; actionImages: string[] } | null>(null);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [galleryError, setGalleryError] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [brandProductImages, setBrandProductImages] = useState<string[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -39,15 +41,19 @@ export default function BrandDashboard() {
 
         // Resolve brandId by slug if not provided
         let resolvedId = brandId;
-        if (!resolvedId) {
+        const trySlug = async () => {
           try {
             const { brand } = await apiClient.getBrandBySlug('flowform');
-            resolvedId = brand.brandId;
+            return brand.brandId;
           } catch {
             const list = await apiClient.listBrands();
             const flow = list.brands?.find((b) => b.urlSlug === 'flowform');
-            resolvedId = flow?.brandId;
+            return flow?.brandId;
           }
+        };
+
+        if (!resolvedId) {
+          resolvedId = await trySlug();
         }
 
         if (!resolvedId) {
@@ -56,8 +62,23 @@ export default function BrandDashboard() {
           return;
         }
 
-        const [brandRes, personasRes, environmentsRes, cardsRes, influencersRes] = await Promise.all([
-          apiClient.getBrand(resolvedId),
+        let brandRes;
+        try {
+          brandRes = await apiClient.getBrand(resolvedId);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : '';
+          if (msg.includes('404')) {
+            const fallbackId = await trySlug();
+            if (fallbackId && fallbackId !== resolvedId) {
+              navigate(`/brand/${fallbackId}`, { replace: true });
+              resolvedId = fallbackId;
+              brandRes = await apiClient.getBrand(resolvedId);
+            }
+          }
+          if (!brandRes) throw e;
+        }
+
+        const [personasRes, environmentsRes, cardsRes, influencersRes] = await Promise.all([
           apiClient.getPersonas(resolvedId),
           apiClient.getEnvironments(resolvedId),
           apiClient.getCards(resolvedId),
@@ -73,6 +94,7 @@ export default function BrandDashboard() {
         };
 
         setData(brandData);
+        setBrandProductImages(brandData.brand.productImages ?? []);
 
         const initialStates: Record<string, { enabled: boolean; isDefault: boolean }> = {};
         brandData.influencers.forEach((inf) => {
@@ -269,10 +291,10 @@ export default function BrandDashboard() {
       {/* Tab Navigation */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '2px solid #dee2e6' }}>
         <button
-          onClick={() => setActiveTab('brand')}
-          style={tabStyle(activeTab === 'brand')}
+          onClick={() => setActiveTab('product')}
+          style={tabStyle(activeTab === 'product')}
         >
-          Brand
+          Product
         </button>
         <button
           onClick={() => setActiveTab('influencers')}
@@ -308,12 +330,15 @@ export default function BrandDashboard() {
 
       {/* Tab Content */}
       <div style={{ padding: '1.5rem', background: '#f8f9fa', borderRadius: '0 4px 4px 4px', minHeight: '400px' }}>
-        {activeTab === 'brand' && (
+        {activeTab === 'product' && (
           <BrandTab
             brand={data.brand}
             personas={data.personas}
             environments={data.environments}
             cards={data.cards}
+            onImageClick={(url) => setLightboxUrl(url)}
+            onUploadProductImage={handleUploadProductImage}
+            productImages={brandProductImages}
           />
         )}
         {activeTab === 'influencers' && (
@@ -336,8 +361,9 @@ export default function BrandDashboard() {
                   <img
                     src={gallery?.headshot || selectedInfluencer.imageUrl || `https://placehold.co/400x200?text=${encodeURIComponent(selectedInfluencer.name)}`}
                     alt={selectedInfluencer.name}
-                    style={{ width: '240px', height: '240px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e9ecef' }}
+                    style={{ width: '240px', height: '240px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e9ecef', cursor: 'zoom-in' }}
                     onError={(e) => { e.currentTarget.src = `https://placehold.co/400x200?text=${encodeURIComponent(selectedInfluencer.name)}`; }}
+                    onClick={() => setLightboxUrl(gallery?.headshot || selectedInfluencer.imageUrl)}
                   />
                   <div style={{ flex: 1, minWidth: '260px' }}>
                     <h3 style={{ margin: '0 0 0.5rem 0' }}>{selectedInfluencer.name}</h3>
@@ -366,8 +392,9 @@ export default function BrandDashboard() {
                           key={idx}
                           src={url}
                           alt={`${selectedInfluencer.name} action ${idx + 1}`}
-                          style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e9ecef' }}
+                          style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e9ecef', cursor: 'zoom-in' }}
                           onError={(e) => { e.currentTarget.src = `https://placehold.co/400x200?text=${encodeURIComponent(selectedInfluencer.name)}`; }}
+                          onClick={() => setLightboxUrl(url)}
                         />
                       ))}
                     </div>
@@ -382,6 +409,7 @@ export default function BrandDashboard() {
             cards={data.cards}
             influencers={data.influencers}
             personas={data.personas}
+            onImageClick={(url) => setLightboxUrl(url)}
           />
         )}
         {activeTab === 'publish' && (
@@ -416,12 +444,50 @@ export default function BrandDashboard() {
           Back to Home
         </Link>
       </div>
+
+      {lightboxUrl && (
+        <div
+          role="presentation"
+          onClick={() => setLightboxUrl(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem'
+          }}
+        >
+          <img
+            src={lightboxUrl}
+            alt="Full size"
+            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px', background: '#000' }}
+            onClick={(e) => e.stopPropagation()}
+            onError={(e) => { e.currentTarget.src = `https://placehold.co/800x800?text=Image`; }}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
-function BrandTab({ brand, personas, environments, cards }: { brand: BrandData['brand']; personas: Persona[]; environments: Environment[]; cards: Card[] }) {
-  const productImages = cards.slice(0, 3).map(c => c.imageUrl || `https://placehold.co/400x250?text=${encodeURIComponent(brand.name)}`);
+function BrandTab({ brand, personas, environments, cards, onImageClick, onUploadProductImage, productImages }: { brand: BrandData['brand']; personas: Persona[]; environments: Environment[]; cards: Card[]; onImageClick: (url: string) => void; onUploadProductImage: (url: string) => void; productImages: string[] }) {
+  const fallbackImages = cards.slice(0, 3).map(c => c.imageUrl || `https://placehold.co/400x250?text=${encodeURIComponent(brand.name)}`);
+  const imagesToShow = productImages.length > 0 ? productImages : fallbackImages;
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        onUploadProductImage(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
   return (
     <div>
       <h2 style={{ marginBottom: '1rem' }}>{brand.name}</h2>
@@ -434,9 +500,27 @@ function BrandTab({ brand, personas, environments, cards }: { brand: BrandData['
           </a>
         ))}
       </div>
+      <div style={{ marginBottom: '0.75rem' }}>
+        <label style={{ display: 'inline-block', padding: '0.5rem 1rem', background: '#e9ecef', borderRadius: '6px', border: '1px solid #ced4da', cursor: 'pointer', fontWeight: 'bold' }}>
+          Upload product image
+          <input
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleFileUpload}
+          />
+        </label>
+        <span style={{ marginLeft: '0.75rem', color: '#6c757d', fontSize: '0.95rem' }}>Images appear in the product gallery below.</span>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        {productImages.map((url, idx) => (
-          <img key={idx} src={url} alt={`Product ${idx + 1}`} style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e9ecef' }} />
+        {imagesToShow.map((url, idx) => (
+          <img
+            key={idx}
+            src={url}
+            alt={`Product ${idx + 1}`}
+            style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e9ecef', cursor: 'zoom-in' }}
+            onClick={() => onImageClick(url)}
+          />
         ))}
       </div>
 
@@ -595,10 +679,15 @@ function InfluencersTab({
                     objectFit: 'cover',
                     borderRadius: '6px',
                     marginBottom: '0.75rem',
-                    border: '1px solid #e9ecef'
+                    border: '1px solid #e9ecef',
+                    cursor: 'zoom-in'
                   }}
                   onError={(e) => {
                     e.currentTarget.src = `https://placehold.co/400x200?text=${encodeURIComponent(influencer.name)}`;
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxUrl(influencer.imageUrl);
                   }}
                 />
               )}
@@ -804,3 +893,14 @@ function PublishTab({
     </div>
   );
 }
+  const handleUploadProductImage = async (dataUrl: string) => {
+    try {
+      if (!data) return;
+      const res = await apiClient.addProductImage(data.brand.brandId, dataUrl);
+      const next = res.brand.productImages || [];
+      setBrandProductImages(next);
+      setData(prev => prev ? { ...prev, brand: { ...prev.brand, productImages: next } } : prev);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to upload product image');
+    }
+  };

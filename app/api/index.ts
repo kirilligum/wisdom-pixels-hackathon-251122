@@ -134,6 +134,16 @@ app.get('/api/brands/:brandId/environments', async (c) => {
   const environments = await environmentsRepo.findByBrandId(brandId);
   return c.json({ environments });
 });
+app.post('/api/brands/:brandId/images', async (c) => {
+  const brandId = c.req.param('brandId');
+  const body = await c.req.json();
+  const url = body?.url;
+  if (!url || typeof url !== 'string') return c.json({ error: 'url is required' }, 400);
+  const brand = await brandsRepo.findById(brandId);
+  if (!brand) return c.json({ error: 'Brand not found' }, 404);
+  const updated = await brandsRepo.update(brandId, { productImages: [url] });
+  return c.json({ brand: updated });
+});
 
 app.post('/api/brands/:brandId/cards/generate', async (c) => {
   const brandId = c.req.param('brandId');
@@ -210,6 +220,8 @@ app.delete('/api/influencers/:influencerId', async (c) => {
   const influencerId = c.req.param('influencerId');
   const existing = await influencersRepo.findById(influencerId);
   if (!existing) return c.json({ error: 'Influencer not found' }, 404);
+  // Remove dependent cards first to satisfy FK constraint
+  await cardsRepo.deleteByInfluencerId(influencerId);
   await influencersRepo.delete(influencerId);
   return c.json({ success: true });
 });
@@ -224,24 +236,7 @@ app.patch('/api/influencers/:influencerId/enabled', async (c) => {
 });
 
 app.post('/api/influencers/find-new', async () => {
-  const baseSet = [
-    {
-      name: 'Sarah Chen',
-      bio: 'Tech entrepreneur and productivity expert with 15 years of experience building successful SaaS products.',
-      domain: 'SaaS & Productivity',
-    },
-    {
-      name: 'Marcus Johnson',
-      bio: 'Former Fortune 500 project manager turned business consultant, helping companies optimize workflows.',
-      domain: 'Project Management',
-    },
-    {
-      name: 'Dr. Emily Rodriguez',
-      bio: 'Organizational psychologist specializing in team dynamics and remote work effectiveness.',
-      domain: 'Team Psychology',
-    },
-  ];
-
+  console.log('[find-new] request received');
   const additionsPool = [
     {
       name: 'Jordan Lee',
@@ -266,28 +261,20 @@ app.post('/api/influencers/find-new', async () => {
   ];
 
   const all = await influencersRepo.findAll();
+  console.log('[find-new] existing count', all.length);
   const existingNames = new Set(all.map(i => i.name));
-
-  // Ensure the core set exists, enabled, and has stored galleries
-  for (const core of baseSet) {
-    const match = all.find(i => i.name === core.name);
-    if (match) {
-      if (!match.enabled) {
-        await influencersRepo.update(match.influencerId, { enabled: true });
-      }
-      await ensureInfluencerGallery(match);
-    } else {
-      await createInfluencerWithImages(core);
-    }
-  }
 
   // Add exactly one new influencer per click if available
   const newCandidate = additionsPool.find((info) => !existingNames.has(info.name));
   if (newCandidate) {
+    console.log('[find-new] adding new candidate', newCandidate.name);
     await createInfluencerWithImages(newCandidate);
+  } else {
+    console.log('[find-new] no new candidate available; returning current list');
   }
 
   const finalList = await influencersRepo.findEnabled();
+  console.log('[find-new] final enabled count', finalList.length);
   return new Response(JSON.stringify({ influencers: finalList }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 });
 

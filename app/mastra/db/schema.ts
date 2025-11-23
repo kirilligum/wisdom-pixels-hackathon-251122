@@ -12,6 +12,7 @@ export const brands = sqliteTable('brands', {
   description: text('description'),
   urlSlug: text('url_slug').notNull().unique(),
   contentSources: text('content_sources', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+  productImages: text('product_images', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
@@ -65,7 +66,7 @@ export const influencers = sqliteTable('influencers', {
 export const cards = sqliteTable('cards', {
   cardId: text('card_id').primaryKey(),
   brandId: text('brand_id').notNull().references(() => brands.brandId, { onDelete: 'cascade' }),
-  influencerId: text('influencer_id').notNull().references(() => influencers.influencerId),
+  influencerId: text('influencer_id').notNull().references(() => influencers.influencerId, { onDelete: 'cascade' }),
   personaId: text('persona_id').references(() => personas.personaId),
   environmentId: text('environment_id').references(() => environments.environmentId),
   query: text('query').notNull(),

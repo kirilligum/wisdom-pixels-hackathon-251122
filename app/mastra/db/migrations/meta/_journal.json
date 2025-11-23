@@ -1,5 +1,5 @@
 {
-  "version": "7",
+  "version": "10",
   "dialect": "sqlite",
   "entries": [
     {
@@ -14,6 +14,27 @@
       "version": "7",
       "when": 1763971440000,
       "tag": "0001_cached_gallery",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "8",
+      "when": 1763979000000,
+      "tag": "0002_drop_cards",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "9",
+      "when": 1763979050000,
+      "tag": "0003_create_cards_cascade",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "10",
+      "when": 1763982000000,
+      "tag": "0004_brand_product_images",
       "breakpoints": true
     }
   ]

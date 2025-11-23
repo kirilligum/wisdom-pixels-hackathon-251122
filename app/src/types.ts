@@ -8,6 +8,7 @@ export interface Brand {
   name: string;
   domain: string;
   description?: string | null;
+  productImages?: string[];
   contentSources: string[]; // URLs or text references
   urlSlug?: string;
 }

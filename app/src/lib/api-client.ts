@@ -25,6 +25,7 @@ export type Brand = {
   name: string;
   domain: string;
   description?: string | null;
+  productImages?: string[];
   urlSlug: string;
   contentSources: string[];
 };
@@ -116,6 +117,9 @@ export const apiClient = {
 
   generateContent: (prompt: string) =>
     request<{ text: string }>(`/api/content/generate`, 'POST', { prompt }),
+
+  addProductImage: (brandId: string, imageUrl: string) =>
+    request<{ brand: Brand }>(`/api/brands/${brandId}/images`, 'POST', { url: imageUrl }),
 };
 
 export type ApiClient = typeof apiClient;

@@ -143,6 +143,13 @@ export class CardsRepository {
   }
 
   /**
+   * Delete all cards for an influencer
+   */
+  async deleteByInfluencerId(influencerId: string): Promise<void> {
+    await this.db.delete(cards).where(eq(cards.influencerId, influencerId));
+  }
+
+  /**
    * Delete all cards for a brand
    */
   async deleteByBrandId(brandId: string): Promise<void> {

@@ -6,9 +6,10 @@ interface CardGalleryProps {
   cards: Card[];
   influencers: Influencer[];
   personas: Persona[];
+  onImageClick?: (url: string) => void;
 }
 
-export default function CardGallery({ cards, influencers, personas }: CardGalleryProps) {
+export default function CardGallery({ cards, influencers, personas, onImageClick }: CardGalleryProps) {
   const navigate = useNavigate();
   const [influencerFilter, setInfluencerFilter] = useState('all');
   const [personaFilter, setPersonaFilter] = useState('all');
@@ -114,7 +115,11 @@ export default function CardGallery({ cards, influencers, personas }: CardGaller
                 src={card.imageUrl}
                 alt={card.imageBrief || card.query}
                 onError={(e) => { e.currentTarget.src = `https://placehold.co/400x250?text=${encodeURIComponent(card.query)}`; }}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onImageClick?.(card.imageUrl);
+                }}
               />
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0.5rem', background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%)', color: 'white', fontSize: '0.85rem' }}>
                 {card.imageBrief}

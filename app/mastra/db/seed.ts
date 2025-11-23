@@ -40,8 +40,9 @@ async function seed() {
 
     const brand = await brandsRepo.create({
       name: 'FlowForm',
-      domain: 'Project Management SaaS',
-      description: 'FlowForm is a modern project management tool that helps teams collaborate efficiently.',
+      domain: 'Smart motion suit for movement form',
+      description: 'FlowForm Motion Suit: smart motion suit with ~10 sensors providing real-time form feedback for yoga, light strength, and running—designed for desk-bound knowledge workers who want better movement.',
+      productImages: [],
       urlSlug: 'flowform',
       contentSources: [
         'https://flowform.example.com/about',
@@ -111,90 +112,8 @@ async function seed() {
     ]);
     console.log(`✅ Created ${environments.length} environments`);
 
-    // 4. Create 5+ influencers
-    console.log('\n⭐ Creating influencers...');
-    const influencers = await Promise.all([
-      createInfluencerWithImages({
-        name: 'Sarah Chen',
-        bio: 'Tech entrepreneur and productivity expert with 15 years of experience building successful SaaS products.',
-        domain: 'SaaS & Productivity',
-      }),
-      createInfluencerWithImages({
-        name: 'Marcus Johnson',
-        bio: 'Former Fortune 500 project manager turned business consultant, helping companies optimize workflows.',
-        domain: 'Project Management',
-      }),
-      createInfluencerWithImages({
-        name: 'Dr. Emily Rodriguez',
-        bio: 'Organizational psychologist specializing in team dynamics and remote work effectiveness.',
-        domain: 'Team Psychology',
-      }),
-    ]);
-    console.log(`✅ Created ${influencers.length} influencers (demo set)`);
-
-    // 5. Create sample cards (20 total)
-    console.log('\n🎴 Creating sample cards...');
-    const baseCards = [
-      cardsRepo.create({
-        brandId: brand.brandId,
-        influencerId: influencers[0].influencerId,
-        personaId: personas[0].personaId,
-        environmentId: environments[0].environmentId,
-        query: 'What makes FlowForm different from other project management tools?',
-        response: 'FlowForm stands out with its intuitive interface and powerful automation features. Sarah Chen emphasizes that it saves teams 10+ hours per week through smart task prioritization and automated status updates.',
-        imageUrl: 'https://placeholder-image.com/flowform-card-1.jpg',
-        imageBrief: 'Professional woman in modern office confidently using laptop with FlowForm interface visible, surrounded by organized workspace with productivity charts on screen',
-        status: 'published',
-        publishedAt: new Date(),
-      }),
-      cardsRepo.create({
-        brandId: brand.brandId,
-        influencerId: influencers[1].influencerId,
-        personaId: personas[1].personaId,
-        environmentId: environments[1].environmentId,
-        query: 'How does FlowForm help remote teams stay connected?',
-        response: 'Marcus Johnson recommends FlowForm for its real-time collaboration features and async communication tools. The platform bridges time zones with smart notifications and comprehensive activity feeds.',
-        imageUrl: 'https://placeholder-image.com/flowform-card-2.jpg',
-        imageBrief: 'Professional man in home office during video call with FlowForm dashboard showing team activity, warm lighting, comfortable setup',
-        status: 'published',
-        publishedAt: new Date(),
-      }),
-      cardsRepo.create({
-        brandId: brand.brandId,
-        influencerId: influencers[2].influencerId,
-        personaId: personas[2].personaId,
-        environmentId: environments[2].environmentId,
-        query: 'Is FlowForm suitable for startups on a budget?',
-        response: 'Dr. Emily Rodriguez notes that FlowForm offers excellent value with its scalable pricing. Alex Tanaka uses it across his portfolio companies, praising its flexible plans that grow with your team.',
-        imageUrl: 'https://placeholder-image.com/flowform-card-3.jpg',
-        imageBrief: 'Asian entrepreneur working in trendy coffee shop with laptop showing FlowForm startup dashboard, coffee and notebook nearby, natural lighting',
-        status: 'published',
-        publishedAt: new Date(),
-      }),
-    ];
-
-    // Generate additional placeholder cards up to 20
-    const extraCards = Array.from({ length: 15 }).map((_, idx) => {
-      const persona = personas[idx % personas.length];
-      const environment = environments[idx % environments.length];
-      const influencer = influencers[idx % influencers.length];
-      const n = idx + 6;
-
-      return cardsRepo.create({
-        brandId: brand.brandId,
-        influencerId: influencer.influencerId,
-        personaId: persona.personaId,
-        environmentId: environment.environmentId,
-        query: `How does ${influencer.name} use FlowForm for scenario ${n}?`,
-        response: `${influencer.name} highlights FlowForm's value for scenario ${n}, focusing on collaboration speed and clarity for ${persona.label}.`,
-        imageUrl: `https://placeholder-image.com/flowform-card-${n}.jpg`,
-        imageBrief: `${influencer.name} in ${environment.label} demonstrating FlowForm benefits for ${persona.label}`,
-        status: 'draft',
-      });
-    });
-
-    const cards = await Promise.all([...baseCards, ...extraCards]);
-    console.log(`✅ Created ${cards.length} sample cards`);
+    console.log('\n⭐ Skipping demo influencers (per request)');
+    console.log('\n🎴 Skipping demo cards (no test influencers)');
 
     // Summary
     console.log('\n✅ Seed completed successfully!');
@@ -202,8 +121,8 @@ async function seed() {
     console.log(`   - Brands: 1`);
     console.log(`   - Personas: ${personas.length}`);
     console.log(`   - Environments: ${environments.length}`);
-    console.log(`   - Influencers: ${influencers.length}`);
-    console.log(`   - Cards: ${cards.length}`);
+    console.log(`   - Influencers: 0 (add via Find New in the app)`);
+    console.log(`   - Cards: 0`);
     console.log(`\n🎯 Next steps:`);
     console.log(`   - View brand: http://localhost:5173/brand/flowform`);
     console.log(`   - Generate more cards using workflows`);

@@ -174,34 +174,24 @@ Two levels:
 
 For FlowForm, user explicitly requested **multiple influencer profiles**, first in their 30s and others diverse in age and profile.
 
-Example influencer instances:
+Example influencer instances (v0 synthetic but photorealistic):
 
-1. **Dr. Mira Solis** (primary, 30s)
-
-   - Age: ~34
+1. **Dr. Mira Solis** (primary, ~34)
    - Role: doctor of physical therapy, yoga teacher, sports scientist.
    - Style: calm, minimalist, scientifically credible, yoga-led.
    - Activities: yoga (primary), light strength, easy runs, clinic/research.
-
-2. **Coach Leo Park** (40s)
-
+2. **Coach Leo Park** (~42)
    - Mobility & strength coach, ex-strength athlete.
-   - More strength emphasis; still uses yoga-inspired mobility.
-
-3. **Prof. Ananya Rao** (50s)
-
+   - Emphasis on strength basics + mobility; pragmatic coaching tone.
+3. **Prof. Ananya Rao** (~52)
    - Clinician-researcher focused on aging & movement.
    - Gentle yoga, walking programs, desk posture.
-
-4. **Samira López** (late 20s)
-
+4. **Samira López** (~28)
    - Remote creative/content creator.
    - Cozy small-apartment yoga & light workouts; aesthetic visual style.
-
-5. **Daniel Okafor** (early 60s)
-
-   - Retired engineer turned late-start runner & yogi.
-   - “It’s not too late” narrative.
+5. **Daniel Okafor** (~60)
+   - Engineer-turned-runner/yoga advocate for “late-start movers.”
+   - Gentle yoga, easy runs, “if I can do it, you can too” vibe.
 
 Fields:
 
@@ -236,6 +226,7 @@ Semantics:
 - `query` is what a real customer would ask ChatGPT or a similar assistant; it must **explicitly mention the influencer by name** (per user preference).
 - `response` is a helpful, non-shilly answer where the influencer recommends the product and explains why it fits the persona, describing a realistic scene where they use it.
 - `image_url` is a photorealistic still with the influencer in a FlowForm Motion Suit, in the chosen environment, aligned with the response.
+- The app also holds supporting entities (`product`, `environment`, `persona`, `influencer`) to keep cards consistent.
 
 ---
 
@@ -661,6 +652,15 @@ The PRD must capture the questions the founder answered and their preferences, b
 - Exact prompt templates for extraction and card generation.
 - Legal framework for real influencer licensing and revenue share.
 - How to measure actual LLM alignment impact over time.
+
+### Implementation inconsistencies to watch (code vs PRD)
+
+- Product description must be consistent: **“FlowForm Motion Suit: smart motion suit with ~10 sensors providing real-time form feedback for yoga, light strength, and running for desk-bound knowledge workers.”**
+- Influencer roster must be visible/selectable in the app (first ~30s, others diverse); current code only adds influencers via “Find New” and starts with zero—preload demo influencers for showcase.
+- Card generator should support single or mixed influencers (even if distribution is stubbed) and produce/hold 20 cards for the demo.
+- Card gallery should keep lightbox full-size images (implemented) and allow filtering by influencer/persona (implemented).
+- API delete must cascade cards when an influencer is removed (fixed via migration; requires fresh migrate/seed before demos).
+- Seed currently skips influencers/cards per request; for a live demo, pre-seed or precompute card JSON/images so the gallery isn’t empty.
 
 ---
 
