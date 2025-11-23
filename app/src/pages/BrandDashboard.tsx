@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import type { BrandData, Persona, Environment } from '../types';
 import flowformData from '../data/flowform-seed.json';
 import CardGallery from '../components/CardGallery';
+import ImageGeneratorTab from '../components/ImageGeneratorTab';
 
-type TabType = 'personas' | 'environments' | 'influencers' | 'cards' | 'publish';
+type TabType = 'personas' | 'environments' | 'influencers' | 'cards' | 'publish' | 'images';
 
 export default function BrandDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('personas');
@@ -131,6 +132,12 @@ export default function BrandDashboard() {
         >
           Publish
         </button>
+        <button
+          onClick={() => setActiveTab('images')}
+          style={tabStyle(activeTab === 'images')}
+        >
+          Generate Images
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -164,6 +171,9 @@ export default function BrandDashboard() {
             onToggleSelection={handleToggleCardSelection}
             onPublish={handlePublishSelected}
           />
+        )}
+        {activeTab === 'images' && (
+          <ImageGeneratorTab brandName={data.brand.name} />
         )}
       </div>
 
