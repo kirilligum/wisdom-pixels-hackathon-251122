@@ -7,10 +7,32 @@ Direct link: https://youtu.be/CQqQXRbRwN4
 
 ## Screenshots
 
-![Wisdom Pixels Screen 1](images/wisdojm_pixels_screen_1.png)
-![Wisdom Pixels Screen 2](images/wisdojm_pixels_screen_2.png)
-![Wisdom Pixels Screen 3](images/wisdojm_pixels_screen_3.png)
-![Wisdom Pixels Screen 4](images/wisdojm_pixels_screen_4.png)
+<table>
+  <tr>
+    <td>
+      <a href="images/wisdojm_pixels_screen_1.png">
+        <img src="images/wisdojm_pixels_screen_1.png" alt="Wisdom Pixels Screen 1" width="380">
+      </a>
+    </td>
+    <td>
+      <a href="images/wisdojm_pixels_screen_2.png">
+        <img src="images/wisdojm_pixels_screen_2.png" alt="Wisdom Pixels Screen 2" width="380">
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <a href="images/wisdojm_pixels_screen_3.png">
+        <img src="images/wisdojm_pixels_screen_3.png" alt="Wisdom Pixels Screen 3" width="380">
+      </a>
+    </td>
+    <td>
+      <a href="images/wisdojm_pixels_screen_4.png">
+        <img src="images/wisdojm_pixels_screen_4.png" alt="Wisdom Pixels Screen 4" width="380">
+      </a>
+    </td>
+  </tr>
+</table>
 
 ## Overview
 
