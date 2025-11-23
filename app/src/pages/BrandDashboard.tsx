@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import type { BrandData, Persona, Environment } from '../types';
 import flowformData from '../data/flowform-seed.json';
+import CardGallery from '../components/CardGallery';
 
-type TabType = 'personas' | 'environments' | 'influencers';
+type TabType = 'personas' | 'environments' | 'influencers' | 'cards';
 
 export default function BrandDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('personas');
@@ -56,6 +57,12 @@ export default function BrandDashboard() {
         >
           Influencers
         </button>
+        <button
+          onClick={() => setActiveTab('cards')}
+          style={tabStyle(activeTab === 'cards')}
+        >
+          Cards
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -68,6 +75,13 @@ export default function BrandDashboard() {
         )}
         {activeTab === 'influencers' && (
           <InfluencersTab influencers={data.influencers} />
+        )}
+        {activeTab === 'cards' && (
+          <CardGallery
+            cards={data.cards}
+            influencers={data.influencers}
+            personas={data.personas}
+          />
         )}
       </div>
 
