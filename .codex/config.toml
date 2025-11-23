@@ -1,0 +1,39 @@
+model = "gpt-5.1-codex-max"
+model_reasoning_effort = "xhigh"
+sandbox = "danger-full-access"
+ask_for_approval = "never"
+
+[projects."/home/kirill/app"]
+trust_level = "trusted"
+
+[projects."/home/kirill/projs/logwindow"]
+trust_level = "trusted"
+
+[projects."/home/kirill/tmp"]
+trust_level = "trusted"
+
+[projects."/home/kirill/app-micro/semantic-clustering"]
+trust_level = "trusted"
+
+[projects."/home/kirill/app_2025-11-08-query-fix"]
+trust_level = "trusted"
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["chrome-devtools-mcp@latest"]
+startup_timeout_sec = 30.0
+
+[mcp_servers.firebase]
+command = "npx"
+args = ["firebase-tools", "mcp", "--only", "core,auth,firestore,storage"]
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["@playwright/mcp@latest"]
+startup_timeout_sec = 30.0
+
+
+[notice]
+hide_full_access_warning = true
+hide_gpt5_1_migration_prompt = true
+"hide_gpt-5.1-codex-max_migration_prompt" = true

@@ -13,6 +13,10 @@ export default {
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // Mock ESM-only packages
+    '^@sindresorhus/slugify$': '<rootDir>/tests/__mocks__/slugify.js',
+    '^escape-string-regexp$': '<rootDir>/tests/__mocks__/escape-string-regexp.js',
+    '^p-map$': '<rootDir>/tests/__mocks__/p-map.js',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
@@ -21,8 +25,15 @@ export default {
         esModuleInterop: true,
       },
     }],
+    '^.+\\.jsx?$': ['ts-jest', {
+      tsconfig: {
+        resolveJsonModule: true,
+        esModuleInterop: true,
+        allowJs: true,
+      },
+    }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@sindresorhus|escape-string-regexp|@mastra)/)',
+    'node_modules/(?!(@sindresorhus|escape-string-regexp|@mastra|@fal-ai)/)',
   ],
 };

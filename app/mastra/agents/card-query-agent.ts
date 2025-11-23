@@ -49,8 +49,8 @@ Generate a question that a customer (persona) might ask about the brand/product,
 Return ONLY the question text, nothing else. Keep it under 200 characters.`,
 
   model: process.env.OPENAI_API_KEY
-    ? { provider: 'openai', name: 'gpt-4o-mini' }
-    : { provider: 'anthropic', name: 'claude-3-5-sonnet-20241022' },
+    ? "openai/gpt-5-nano-2025-08-07"
+    : "anthropic/claude-haiku-4-5",
 
   tools: {
     db: dbTool,

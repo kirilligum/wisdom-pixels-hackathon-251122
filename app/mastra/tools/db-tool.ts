@@ -41,15 +41,17 @@ export const dbTool = createTool({
       'completeWorkflowRun',
       'failWorkflowRun',
     ]),
-    params: z.record(z.any()).optional(),
+    params: z.record(z.string(), z.any()).optional(),
   }),
   outputSchema: z.object({
     success: z.boolean(),
     data: z.any().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runId }) => {
-    const { operation, params = {} } = context;
+  execute: async (input: any) => {
+    const operation = input.operation;
+    const params = input.params || {};
+    const p = params as Record<string, any>;
 
     try {
       let result: any;
@@ -57,25 +59,25 @@ export const dbTool = createTool({
       switch (operation) {
         // Brand operations
         case 'getBrand':
-          result = await brandsRepo.findById(params.brandId);
+          result = await brandsRepo.findById(p.brandId);
           break;
 
         case 'getBrandBySlug':
-          result = await brandsRepo.findBySlug(params.urlSlug);
+          result = await brandsRepo.findBySlug(p.urlSlug);
           break;
 
         case 'createBrand':
           result = await brandsRepo.create({
-            name: params.name,
-            domain: params.domain,
-            description: params.description,
-            urlSlug: params.urlSlug,
-            contentSources: params.contentSources || [],
+            name: p.name,
+            domain: p.domain,
+            description: p.description,
+            urlSlug: p.urlSlug,
+            contentSources: p.contentSources || [],
           });
           break;
 
         case 'updateBrand':
-          result = await brandsRepo.update(params.brandId, params.updates);
+          result = await brandsRepo.update(p.brandId, p.updates);
           break;
 
         case 'listBrands':
@@ -84,29 +86,29 @@ export const dbTool = createTool({
 
         // Persona operations
         case 'getPersonasByBrand':
-          result = await personasRepo.findByBrandId(params.brandId);
+          result = await personasRepo.findByBrandId(p.brandId);
           break;
 
         case 'createPersona':
           result = await personasRepo.create({
-            brandId: params.brandId,
-            label: params.label,
-            description: params.description,
-            tags: params.tags || [],
+            brandId: p.brandId,
+            label: p.label,
+            description: p.description,
+            tags: p.tags || [],
           });
           break;
 
         // Environment operations
         case 'getEnvironmentsByBrand':
-          result = await environmentsRepo.findByBrandId(params.brandId);
+          result = await environmentsRepo.findByBrandId(p.brandId);
           break;
 
         case 'createEnvironment':
           result = await environmentsRepo.create({
-            brandId: params.brandId,
-            label: params.label,
-            description: params.description,
-            tags: params.tags || [],
+            brandId: p.brandId,
+            label: p.label,
+            description: p.description,
+            tags: p.tags || [],
           });
           break;
 
@@ -121,56 +123,56 @@ export const dbTool = createTool({
 
         // Card operations
         case 'getCard':
-          result = await cardsRepo.findById(params.cardId);
+          result = await cardsRepo.findById(p.cardId);
           break;
 
         case 'getCardsByBrand':
-          result = await cardsRepo.findByBrandId(params.brandId);
+          result = await cardsRepo.findByBrandId(p.brandId);
           break;
 
         case 'getPublishedCardsByBrand':
-          result = await cardsRepo.findPublishedByBrandId(params.brandId);
+          result = await cardsRepo.findPublishedByBrandId(p.brandId);
           break;
 
         case 'createCard':
           result = await cardsRepo.create({
-            brandId: params.brandId,
-            influencerId: params.influencerId,
-            personaId: params.personaId,
-            environmentId: params.environmentId,
-            query: params.query,
-            response: params.response,
-            imageUrl: params.imageUrl,
-            imageBrief: params.imageBrief,
-            status: params.status || 'draft',
+            brandId: p.brandId,
+            influencerId: p.influencerId,
+            personaId: p.personaId,
+            environmentId: p.environmentId,
+            query: p.query,
+            response: p.response,
+            imageUrl: p.imageUrl,
+            imageBrief: p.imageBrief,
+            status: p.status || 'draft',
           });
           break;
 
         case 'publishCard':
-          result = await cardsRepo.publish(params.cardId);
+          result = await cardsRepo.publish(p.cardId);
           break;
 
         case 'incrementCardViews':
-          await cardsRepo.incrementViewCount(params.cardId);
+          await cardsRepo.incrementViewCount(p.cardId);
           result = { success: true };
           break;
 
         // Workflow run operations
         case 'createWorkflowRun':
           result = await workflowRunsRepo.create({
-            workflowName: params.workflowName,
-            brandId: params.brandId,
+            workflowName: p.workflowName,
+            brandId: p.brandId,
             status: 'running',
-            input: params.input,
+            input: p.input,
           });
           break;
 
         case 'completeWorkflowRun':
-          result = await workflowRunsRepo.complete(params.runId, params.output);
+          result = await workflowRunsRepo.complete(p.runId, p.output);
           break;
 
         case 'failWorkflowRun':
-          result = await workflowRunsRepo.fail(params.runId, params.error);
+          result = await workflowRunsRepo.fail(p.runId, p.error);
           break;
 
         default:

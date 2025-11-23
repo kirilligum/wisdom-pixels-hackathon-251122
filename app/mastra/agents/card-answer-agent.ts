@@ -52,8 +52,8 @@ Generate a response to a customer question, as if you ARE the influencer speakin
 Return ONLY the response text in first person, nothing else. Keep under 300 characters.`,
 
   model: process.env.OPENAI_API_KEY
-    ? { provider: 'openai', name: 'gpt-4o-mini' }
-    : { provider: 'anthropic', name: 'claude-3-5-sonnet-20241022' },
+    ? "openai/gpt-5-nano-2025-08-07"
+    : "anthropic/claude-haiku-4-5",
 
   tools: {
     db: dbTool,

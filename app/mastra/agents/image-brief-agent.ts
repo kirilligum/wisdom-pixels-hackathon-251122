@@ -84,8 +84,8 @@ Return a JSON object:
 - Ensure product/brand is visible but not dominating the frame`,
 
   model: process.env.OPENAI_API_KEY
-    ? { provider: 'openai', name: 'gpt-4o-mini' }
-    : { provider: 'anthropic', name: 'claude-3-5-sonnet-20241022' },
+    ? "openai/gpt-5-nano-2025-08-07"
+    : "anthropic/claude-haiku-4-5",
 
   tools: {
     imageGeneration: imageGenerationTool,
