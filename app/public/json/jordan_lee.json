@@ -1,0 +1,15 @@
+{
+  "id": "jordan_lee",
+  "name": "Jordan Lee",
+  "domain": "Strength & Conditioning",
+  "bio": "Strength & conditioning coach focused on wearable-driven training plans.",
+  "followers": 120000,
+  "engagement": 4.8,
+  "avgViews": 85000,
+  "platforms": ["IG", "YT", "TikTok"],
+  "semanticFit": 92,
+  "datasetDiversity": 88,
+  "partners": ["Lululemon", "Whoop"],
+  "competitors": ["Nike", "Garmin"]
+}
+

@@ -83,12 +83,64 @@ export default function BrandDashboard() {
           apiClient.getInfluencers(),
         ]);
 
+        let influencers = influencersRes.influencers || [];
+        let cards = cardsRes.cards || [];
+
+        // For the FlowForm demo, if there are no influencers/cards, fall back to Jordan Lee placeholders
+        const isFlowForm = brandRes.brand.urlSlug === 'flowform';
+        if (isFlowForm && influencers.length === 0) {
+          try {
+            const resp = await fetch('/json/jordan_lee.json');
+            if (resp.ok) {
+              const j = await resp.json() as any;
+              const placeholderInfluencer: Influencer = {
+                influencerId: 'placeholder-jordan-lee',
+                name: j.name || 'Jordan Lee',
+                bio: j.bio || 'Strength & conditioning coach focused on wearable-driven training plans.',
+                domain: j.domain || 'Strength & Conditioning',
+                imageUrl: '/images/jordan_lee/influencers/influencer_jordan_lee_protrait.png',
+                actionImageUrls: [
+                  '/images/jordan_lee/influencers/influencer_jordan_lee_1.png',
+                  '/images/jordan_lee/influencers/influencer_jordan_lee_2.png',
+                ],
+                enabled: true,
+              };
+              influencers = [placeholderInfluencer];
+            }
+          } catch {
+            // ignore placeholder failure
+          }
+        }
+
+        if (isFlowForm && cards.length === 0) {
+          try {
+            const resp = await fetch('/json/jordan_lee_cards.json');
+            if (resp.ok) {
+              const json = await resp.json() as any[];
+              cards = json.map((c) => ({
+                cardId: c.id,
+                brandId: brandRes.brand.brandId,
+                influencerId: 'placeholder-jordan-lee',
+                personaId: null,
+                environmentId: null,
+                query: c.query,
+                response: c.response,
+                imageUrl: c.imageUrl,
+                imageBrief: c.imageBrief,
+                status: 'draft',
+              } as Card));
+            }
+          } catch {
+            // ignore placeholder failure
+          }
+        }
+
         const brandData: BrandData = {
           brand: brandRes.brand,
           personas: personasRes.personas,
           environments: environmentsRes.environments,
-          influencers: influencersRes.influencers || [],
-          cards: cardsRes.cards,
+          influencers,
+          cards,
         };
 
         setData(brandData);

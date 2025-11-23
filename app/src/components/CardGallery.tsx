@@ -139,6 +139,9 @@ export default function CardGallery({ cards, influencers, personas, onImageClick
                 {getInfluencerName(card.influencerId)}
               </div>
 
+              <div style={{ fontSize: '0.8rem', color: '#6c757d', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                Query
+              </div>
               <div
                 data-testid="card-query"
                 style={{
@@ -152,6 +155,24 @@ export default function CardGallery({ cards, influencers, personas, onImageClick
                 }}
               >
                 {card.query}
+              </div>
+
+              <div style={{ fontSize: '0.8rem', color: '#6c757d', marginTop: '0.75rem', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                Response
+              </div>
+              <div
+                data-testid="card-response"
+                style={{
+                  fontSize: '0.9rem',
+                  color: '#6c757d',
+                  lineHeight: '1.4',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 4,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
+                }}
+              >
+                {card.response}
               </div>
 
               <div style={{

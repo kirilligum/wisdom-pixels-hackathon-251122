@@ -1,0 +1,30 @@
+{
+  "id": "flowform_motion_suit",
+  "name": "FlowForm Motion Suit",
+  "tagline": "Smart motion suit for desk-bound athletes",
+  "description": "FlowForm Motion Suit is a smart compression suit with approximately 10 motion sensors on the arms, legs, chest, and head. It provides real-time form feedback for yoga, light strength work, and easy running, helping desk-bound knowledge workers move with more control and confidence.",
+  "sensors": {
+    "count": 10,
+    "placement": ["left arm", "right arm", "left leg", "right leg", "chest", "headband"],
+    "outputs": ["joint angles", "posture cues", "stride metrics"]
+  },
+  "primaryUseCases": [
+    "Yoga alignment feedback in small apartments",
+    "Light strength training with better form awareness",
+    "Easy park runs with gait and posture insights"
+  ],
+  "targetCustomers": [
+    "WFH yoga creatives",
+    "Mid-career knowledge workers with stiff backs",
+    "Beginner runners who cross-train with yoga",
+    "Young parents squeezing in efficient home workouts"
+  ],
+  "environments": [
+    "Small urban apartment yoga space",
+    "Mountain waterfall yoga retreat",
+    "Clinic or research office with standing desk",
+    "Minimal home strength corner",
+    "City park running trail"
+  ]
+}
+
