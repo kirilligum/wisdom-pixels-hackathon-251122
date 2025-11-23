@@ -26,7 +26,7 @@ export default function CardGallery({ cards, influencers, personas, onImageClick
   });
 
   const getInfluencerName = (influencerId: string) => {
-    return influencers.find(i => i.influencerId === influencerId)?.name || 'Unknown';
+    return influencers.find((i) => i.influencerId === influencerId)?.name || '';
   };
 
   return (

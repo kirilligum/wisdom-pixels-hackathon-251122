@@ -81,8 +81,7 @@ Key components inside `app/`:
 - `src/pages/BrandDashboard.tsx` – main dashboard:
   - **Product** tab – FlowForm description, content sources, product gallery (DB‑backed uploads).
   - **Influencers** tab – roster, enable/disable, “Find New”, delete, influencer galleries.
-  - **Cards** tab – Wisdom Card gallery (filters, full‑size image lightbox).
-  - **Publish** tab – select and mark cards as published.
+  - **Cards** tab – Wisdom Card gallery (filters, full‑size image lightbox, status badges).
 - `src/components/CardGallery.tsx` – card grid with influencer/persona filters and lightbox on image click.
 
 **API (Hono + Node)**
@@ -264,8 +263,7 @@ Then open `http://localhost:5173` and:
 - Click **View FlowForm Brand** → open the Brand Dashboard.  
 - Use the **Product** tab to see FlowForm description, content sources, and upload product images (persisted in DB).  
 - Use **Influencers** to add/delete influencers, toggle Enabled, and view galleries.  
-- Use **Cards** to browse Wisdom Cards (image + query + status).  
-- Use **Publish** to mark cards as published.
+- Use **Cards** to browse Wisdom Cards (image + query + response + status).
 
 ---
 

@@ -30,6 +30,7 @@ export default function BrandDashboard() {
   const [galleryError, setGalleryError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [brandProductImages, setBrandProductImages] = useState<string[]>([]);
+  const [isGeneratingDataset, setIsGeneratingDataset] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -86,52 +87,117 @@ export default function BrandDashboard() {
         let influencers = influencersRes.influencers || [];
         let cards = cardsRes.cards || [];
 
-        // For the FlowForm demo, if there are no influencers/cards, fall back to Jordan Lee placeholders
+        // For the FlowForm demo, if there are no influencers/cards, fall back to placeholder influencers/cards
         const isFlowForm = brandRes.brand.urlSlug === 'flowform';
-        if (isFlowForm && influencers.length === 0) {
-          try {
-            const resp = await fetch('/json/jordan_lee.json');
-            if (resp.ok) {
-              const j = await resp.json() as any;
-              const placeholderInfluencer: Influencer = {
-                influencerId: 'placeholder-jordan-lee',
-                name: j.name || 'Jordan Lee',
-                bio: j.bio || 'Strength & conditioning coach focused on wearable-driven training plans.',
-                domain: j.domain || 'Strength & Conditioning',
-                imageUrl: '/images/jordan_lee/influencers/influencer_jordan_lee_protrait.png',
-                actionImageUrls: [
-                  '/images/jordan_lee/influencers/influencer_jordan_lee_1.png',
-                  '/images/jordan_lee/influencers/influencer_jordan_lee_2.png',
-                ],
-                enabled: true,
-              };
-              influencers = [placeholderInfluencer];
+        if (isFlowForm) {
+          // Ensure Jordan Lee placeholder exists
+          if (!influencers.some((inf) => inf.name === 'Jordan Lee')) {
+            try {
+              const resp = await fetch('/json/jordan_lee.json');
+              if (resp.ok) {
+                const j = (await resp.json()) as any;
+                const placeholderJordan: Influencer = {
+                  influencerId: 'placeholder-jordan-lee',
+                  name: j.name || 'Jordan Lee',
+                  bio: j.bio || 'Strength & conditioning coach focused on wearable-driven training plans.',
+                  domain: j.domain || 'Strength & Conditioning',
+                  imageUrl: '/images/jordan_lee/influencers/influencer_jordan_lee_protrait.png',
+                  actionImageUrls: [
+                    '/images/jordan_lee/influencers/influencer_jordan_lee_1.png',
+                    '/images/jordan_lee/influencers/influencer_jordan_lee_2.png',
+                  ],
+                  enabled: true,
+                };
+                influencers = [placeholderJordan, ...influencers];
+              }
+            } catch {
+              // ignore placeholder failure
             }
-          } catch {
-            // ignore placeholder failure
           }
-        }
 
-        if (isFlowForm && cards.length === 0) {
-          try {
-            const resp = await fetch('/json/jordan_lee_cards.json');
-            if (resp.ok) {
-              const json = await resp.json() as any[];
-              cards = json.map((c) => ({
-                cardId: c.id,
-                brandId: brandRes.brand.brandId,
-                influencerId: 'placeholder-jordan-lee',
-                personaId: null,
-                environmentId: null,
-                query: c.query,
-                response: c.response,
-                imageUrl: c.imageUrl,
-                imageBrief: c.imageBrief,
-                status: 'draft',
-              } as Card));
+          // Ensure Priya Nair placeholder exists
+          if (!influencers.some((inf) => inf.name === 'Priya Nair')) {
+            try {
+              const resp = await fetch('/json/priya_nair.json');
+              if (resp.ok) {
+                const p = (await resp.json()) as any;
+                const placeholderPriya: Influencer = {
+                  influencerId: 'placeholder-priya-nair',
+                  name: p.name || 'Priya Nair',
+                  bio: p.bio || 'Fitness content creator specializing in mobility and injury prevention.',
+                  domain: p.domain || 'Mobility & Recovery',
+                  imageUrl: '/images/priya_nair/influencers/Priya Nair portrait.png',
+                  actionImageUrls: [
+                    '/images/priya_nair/influencers/Priya Nair 1.png',
+                    '/images/priya_nair/influencers/Priya Nair 2.png',
+                  ],
+                  enabled: true,
+                };
+                influencers = [placeholderPriya, ...influencers];
+              }
+            } catch {
+              // ignore placeholder failure
             }
-          } catch {
-            // ignore placeholder failure
+          }
+
+          // If there are no cards yet, hydrate demo cards for both Jordan and Priya
+          if (cards.length === 0) {
+            const demoCards: Card[] = [];
+            try {
+              const respJordan = await fetch('/json/jordan_lee_cards.json');
+              if (respJordan.ok) {
+                const json = (await respJordan.json()) as any[];
+                demoCards.push(
+                  ...json.map(
+                    (c) =>
+                      ({
+                        cardId: c.id,
+                        brandId: brandRes.brand.brandId,
+                        influencerId: 'placeholder-jordan-lee',
+                        personaId: null,
+                        environmentId: null,
+                        query: c.query,
+                        response: c.response,
+                        imageUrl: c.imageUrl,
+                        imageBrief: c.imageBrief,
+                        status: 'draft',
+                      } as Card),
+                  ),
+                );
+              }
+            } catch {
+              // ignore placeholder failure
+            }
+
+            try {
+              const respPriya = await fetch('/json/priya_nair_cards.json');
+              if (respPriya.ok) {
+                const json = (await respPriya.json()) as any[];
+                demoCards.push(
+                  ...json.map(
+                    (c) =>
+                      ({
+                        cardId: c.id,
+                        brandId: brandRes.brand.brandId,
+                        influencerId: 'placeholder-priya-nair',
+                        personaId: null,
+                        environmentId: null,
+                        query: c.query,
+                        response: c.response,
+                        imageUrl: c.imageUrl,
+                        imageBrief: c.imageBrief,
+                        status: 'draft',
+                      } as Card),
+                  ),
+                );
+              }
+            } catch {
+              // ignore placeholder failure
+            }
+
+            if (demoCards.length > 0) {
+              cards = demoCards;
+            }
           }
         }
 
@@ -327,6 +393,15 @@ export default function BrandDashboard() {
     setSelectedCards(new Set());
   };
 
+  const handleGenerateDataset = () => {
+    // Placeholder behavior: simulate an AI job starting
+    setIsGeneratingDataset(true);
+    // Optional: auto-clear after a short delay to keep the UI responsive
+    setTimeout(() => {
+      setIsGeneratingDataset(false);
+    }, 3000);
+  };
+
   if (loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
@@ -455,12 +530,43 @@ export default function BrandDashboard() {
           </>
         )}
         {activeTab === 'cards' && (
-          <CardGallery
-            cards={data.cards}
-            influencers={data.influencers}
-            personas={data.personas}
-            onImageClick={(url) => setLightboxUrl(url)}
-          />
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <h2 style={{ margin: 0 }}>Wisdom Cards</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {isGeneratingDataset && (
+                  <span style={{ color: '#6c757d', fontStyle: 'italic', fontSize: '0.95rem' }}>
+                    Thinking …
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleGenerateDataset}
+                  disabled={isGeneratingDataset}
+                  style={{
+                    padding: '0.6rem 1.25rem',
+                    background: isGeneratingDataset ? '#6c757d' : '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: isGeneratingDataset ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '0.95rem',
+                  }}
+                  title="Placeholder: trigger AI dataset generation for these cards"
+                >
+                  {isGeneratingDataset ? 'Generating…' : 'Generate Dataset'}
+                </button>
+              </div>
+            </div>
+
+            <CardGallery
+              cards={data.cards}
+              influencers={data.influencers}
+              personas={data.personas}
+              onImageClick={(url) => setLightboxUrl(url)}
+            />
+          </>
         )}
       </div>
 

@@ -98,6 +98,16 @@ export default function CardDetail() {
   const influencer = data.influencers.find(i => i.influencerId === card.influencerId);
   const persona = data.personas.find(p => p.personaId === card.personaId);
 
+  const cardNumberLabel = (() => {
+    const parts = card.cardId.split('_');
+    const last = parts[parts.length - 1];
+    const n = parseInt(last, 10);
+    if (Number.isFinite(n)) {
+      return `Card ${n}`;
+    }
+    return 'Card';
+  })();
+
   return (
     <div style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto' }}>
       {/* Header */}
@@ -136,7 +146,7 @@ export default function CardDetail() {
         fontSize: '4rem',
         fontWeight: 'bold'
       }}>
-        {card.cardId.split('_')[1] ?? card.cardId}
+        {cardNumberLabel}
       </div>
 
       {/* Card Info */}
