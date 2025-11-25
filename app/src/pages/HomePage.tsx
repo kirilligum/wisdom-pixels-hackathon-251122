@@ -47,7 +47,7 @@ export default function HomePage() {
             color: 'white',
             textDecoration: 'none',
             borderRadius: '4px',
-            pointerEvents: flowFormId ? 'auto' : 'none',
+            pointerEvents: loading ? 'none' : 'auto',
             opacity: loading ? 0.6 : 1
           }}
         >
