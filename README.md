@@ -105,6 +105,17 @@ The React UI renders these as a card gallery. Clicking a card shows:
 - The **image** of the influencer in the FlowForm motion suit in a matching scene,
 - A unique URL that can be used for click‑tracking or future multi‑modal training.
 
+In addition to the gallery, Wisdom Pixels publishes a simple **HTML dataset page** per brand at `/dataset/:brandId`. This page contains, for each card:
+
+- the query,
+- the answer,
+- and the associated image wrapped in descriptive HTML (alt text + figcaption) that explicitly ties the image to that query and answer.
+
+This is the main surface that **LLMs can crawl and learn image–text associations from**. The intention is that:
+
+- training pipelines use this HTML dataset as instruction‑style, multi‑modal input, and  
+- future **AI search / assistants** can show the same influencer+product image inline when they answer a similar question. 
+
 ---
 
 ## Architecture

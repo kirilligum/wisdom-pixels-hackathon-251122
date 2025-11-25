@@ -392,14 +392,33 @@ app.get('/dataset/:brandId', async (c) => {
           .map((card, index) => {
             const n = index + 1;
             const imageUrl = card.imageUrl || '';
+            const influencerName = influencerMap.get(card.influencerId) || 'an influencer';
+            const cardQuery = escapeHtml(card.query);
+            const cardResponse = escapeHtml(card.response);
             return `
       <section>
         <h2>Card ${n}</h2>
-        ${imageUrl ? `<div><img src="${escapeHtml(imageUrl)}" alt="Card ${n} image"></div>` : ''}
+        ${
+          imageUrl
+            ? `<figure>
+          <img src="${escapeHtml(
+            imageUrl,
+          )}" alt="Illustration of ${escapeHtml(brand.name)} being used by ${escapeHtml(
+                influencerName,
+              )} in the scenario described in the answer below, in response to the question: ${cardQuery}">
+          <figcaption>
+            Visual depiction of the response below for the query:
+            "<strong>${cardQuery}</strong>". The image shows ${escapeHtml(
+              influencerName,
+            )} using ${escapeHtml(brand.name)} in a setting that matches the answer.
+          </figcaption>
+        </figure>`
+            : ''
+        }
         <h3>Query</h3>
-        <p>${escapeHtml(card.query)}</p>
+        <p>${cardQuery}</p>
         <h3>Response</h3>
-        <p>${escapeHtml(card.response)}</p>
+        <p>${cardResponse}</p>
       </section>
       `;
           })
