@@ -61,7 +61,7 @@ export const influencers = sqliteTable('influencers', {
 /**
  * Card table - generated training cards with Q&A and images
  * REQ-105: System shall generate 20+ cards per brand
- * REQ-201: Cards must have non-empty imageUrl from FLUX
+ * REQ-305: Cards must have non-empty imageUrl from image generator (Nano Banana Pro)
  */
 export const cards = sqliteTable('cards', {
   cardId: text('card_id').primaryKey(),

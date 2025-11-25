@@ -57,7 +57,7 @@ Wisdom Pixels is an AI-powered training card generation system that creates pers
 │  │     - Flags medical, offensive, spam                │  │
 │  │                                                       │  │
 │  │  5. ImageBriefAgent                                 │  │
-│  │     - Generates FLUX prompts (REQ-108)              │  │
+│  │     - Generates image-generation prompts (REQ-108)  │  │
 │  │     - Includes reference images                     │  │
 │  └─────────────────────────────────────────────────────┘  │
 │                                                             │
@@ -87,7 +87,7 @@ Wisdom Pixels is an AI-powered training card generation system that creates pers
 │  │                                                       │  │
 │  │  - DbTool (20 database operations)                  │  │
 │  │  - ContentFetcherTool (URL → text)                  │  │
-│  │  - ImageGenerationTool (FLUX alpha-image-232)       │  │
+│  │  - ImageGenerationTool (Nano Banana Pro)            │  │
 │  │  - UrlSlugTool (unique slug generation)             │  │
 │  └─────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
@@ -115,7 +115,7 @@ Wisdom Pixels is an AI-powered training card generation system that creates pers
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                   EXTERNAL SERVICES                         │
-│  - fal.ai (FLUX alpha-image-232/edit-image)                 │
+│  - fal.ai (nano-banana-pro / nano-banana-pro/edit)         │
 │  - OpenAI (GPT-4o-mini) OR Anthropic (Claude 3.5 Sonnet)   │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -134,7 +134,7 @@ Instead of a single monolithic prompt, Wisdom Pixels uses **5 specialized agents
 | **CardQueryAgent** | Generate questions | Needs understanding of persona pain points |
 | **CardAnswerAgent** | Generate influencer responses | Requires authentic voice + brand knowledge |
 | **SafetyAgent** | Flag policy violations | Specialized safety/compliance knowledge |
-| **ImageBriefAgent** | Create FLUX prompts | Image generation prompt engineering |
+| **ImageBriefAgent** | Create image prompts | Image generation prompt engineering |
 
 ### Benefits of Multi-Agent Approach:
 
@@ -297,7 +297,7 @@ All endpoints use:
 
 ### AI/ML
 - **OpenAI GPT-4o-mini** OR **Anthropic Claude 3.5 Sonnet** - Agent LLMs
-- **fal.ai FLUX alpha-image-232/edit-image** - Image generation with reference images
+- **fal.ai Nano Banana Pro (text + edit)** - Image generation with optional reference images
 
 ### Testing
 - **Jest 30** - Unit testing
@@ -321,7 +321,7 @@ All endpoints use:
 | REQ-105 | Generate 20+ cards per brand | ✅ CardGenerationWorkflow |
 | REQ-106 | Safety review before generation | ✅ SafetyAgent |
 | REQ-107 | Cards can be published | ✅ PublishingWorkflow |
-| REQ-108 | Each card has AI-generated image | ✅ ImageBriefAgent + FLUX |
+| REQ-108 | Each card has AI-generated image | ✅ ImageBriefAgent + Nano Banana Pro |
 | REQ-109 | Images use influencer references | ✅ ImageGenerationTool |
 | REQ-202 | Queries mention influencer name | ✅ CardQueryAgent |
 | REQ-204 | Responses mention brand/product | ✅ CardAnswerAgent |
@@ -473,7 +473,7 @@ npm run db:seed
    - Orchestrated via workflows with parallel execution
 
 2. **Reference-Based Image Generation**
-   - FLUX alpha-image-232/edit-image with reference images
+   - Nano Banana Pro (text + edit) with optional reference images
    - Consistent influencer appearance across all cards
    - Photorealistic product placement
 
@@ -508,7 +508,7 @@ npm run db:seed
    - POST `/api/brands/:id/cards/generate`
    - CardGenerationWorkflow creates 20+ cards
    - Each card: persona × environment × influencer combination
-   - Safety filtering + FLUX image generation
+   - Safety filtering + Nano Banana Pro image generation
 
 3. **Publishing**
    - POST `/api/cards/publish` with card IDs

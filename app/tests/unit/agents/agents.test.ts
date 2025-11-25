@@ -99,7 +99,7 @@ describe('Phase M3: Specialized Agents', () => {
   describe('ImageBriefAgent', () => {
     test('TEST-M3-501: Should have correct configuration', () => {
       expect(imageBriefAgent.name).toBe('ImageBriefAgent');
-      expect(imageBriefAgent.instructions).toContain('FLUX');
+      expect(imageBriefAgent.instructions).toContain('Nano Banana Pro');
       expect(imageBriefAgent.tools).toHaveProperty('imageGeneration');
       expect(imageBriefAgent.tools).toHaveProperty('db');
     });

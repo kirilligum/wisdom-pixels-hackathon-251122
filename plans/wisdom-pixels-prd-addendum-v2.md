@@ -11,45 +11,49 @@ This addendum clarifies aspects of the original PRD and documents the migration 
 
 ---
 
-## 1. FLUX Model Specification Clarification
+## 1. Image Model Specification Clarification (Nano Banana Pro)
 
 ### Original PRD Statement (Line 76-77, 209)
 
 ```
-FLUX 2 via fal.ai:
-  - Model identifier: "fal-ai/alpha-image-232/edit-image"
-  - Use prompt + image_urls inputs; parse images[].url outputs
+Image generation via fal.ai:
+  - Text-to-image model: "fal-ai/nano-banana-pro"
+  - Image-to-image/edit model: "fal-ai/nano-banana-pro/edit"
+  - Use prompt (+ optional image_urls[] for edit); parse images[].url outputs
 ```
 
 ### Clarification
 
-**Model Identifier**: `fal-ai/alpha-image-232/edit-image`
+**Model Identifiers**:
+- Text-to-image: `fal-ai/nano-banana-pro`
+- Image-to-image/edit: `fal-ai/nano-banana-pro/edit`
 
-This is a **FLUX 2-based image editing model** that supports:
+These are Nano Banana Pro-based models that support:
 1. **Text prompts** for image generation
-2. **Reference images** (`image_urls[]`) for style/composition guidance
+2. **Reference images** (`image_urls[]` on the edit endpoint) for style/composition guidance
 3. **Influencer/product placement** via reference images
 
-### Why This Model?
+### Why These Models?
 
-The original PRD specifies `alpha-image-232/edit-image` for specific reasons:
+The updated PRD specifies Nano Banana Pro for specific reasons:
 
-1. **Reference Image Support**: Can take influencer headshots and product photos as inputs
-2. **Photorealistic Output**: Better for product placement than pure text-to-image
+1. **Reference Image Support** (edit endpoint): Can take influencer headshots and product photos as inputs
+2. **Photorealistic Output**: Well-suited for product placement and influencer scenes
 3. **Consistency**: Using reference images creates consistent influencer appearance across cards
-4. **Composition Control**: Better control over product placement and scene composition
+4. **Composition Control**: Aspect ratios and reference images provide better control over composition
 
 ### API Contract
 
 ```typescript
-// Correct usage per PRD
-await fal.subscribe("fal-ai/alpha-image-232/edit-image", {
+// Correct usage per PRD (edit endpoint with reference images)
+await fal.subscribe("fal-ai/nano-banana-pro/edit", {
   input: {
     prompt: string,              // Image generation prompt
-    image_urls: string[],        // 0-2 reference images (influencer, product)
-    image_size?: string,         // "landscape_4_3", etc.
-    seed?: number,               // For reproducibility
-    output_format?: string,      // Default: "jpeg"
+    image_urls: string[],        // 1-2 reference images (influencer, product)
+    num_images?: number,         // Default: 1
+    aspect_ratio?: string,       // e.g., "16:9", "4:3"
+    output_format?: string,      // "png" | "jpeg" | "webp"
+    resolution?: string,         // "1K" | "2K" | "4K"
   }
 });
 
@@ -59,22 +63,21 @@ await fal.subscribe("fal-ai/alpha-image-232/edit-image", {
     url: string,
     content_type: string,
     file_name: string,
-    width: number,
-    height: number
+    width?: number,
+    height?: number
   }],
-  seed: number
+  description: string
 }
 ```
 
 ### Common Mistake (Current Implementation)
 
 ```typescript
-// ❌ INCORRECT - Using Flux Schnell (pure text-to-image, no reference support)
-await fal.subscribe("fal-ai/flux/schnell", {
+// ❌ INCORRECT - Using a different model without reference support
+await fal.subscribe("fal-ai/other-model", {
   input: {
     prompt: string,
-    image_size: string,
-    num_inference_steps: 4
+    aspect_ratio: string
   }
 });
 ```
@@ -83,27 +86,30 @@ await fal.subscribe("fal-ai/flux/schnell", {
 - Cannot use reference images
 - Inconsistent influencer appearance
 - Less control over composition
-- Not meeting REQ-012 requirements
+- Not meeting REQ-012/REQ-209 requirements
 
 ### Migration Action
 
-Phase M2 will create `ImageGenerationTool` with correct model:
+Phase M2 will create `ImageGenerationTool` with correct Nano Banana Pro models:
 
 ```typescript
 // app/mastra/tools/image-generation-tool.ts
 export const imageGenerationTool = createTool({
   id: "image-generation",
-  description: "Generate images using FLUX 2 alpha-image-232/edit-image",
+  description: "Generate images using fal-ai/nano-banana-pro (text) and fal-ai/nano-banana-pro/edit (image edit)",
   inputSchema: z.object({
     prompt: z.string(),
     image_urls: z.array(z.string().url()).optional(),
-    image_size: z.string().optional().default("landscape_4_3"),
-    seed: z.number().optional(),
+    aspect_ratio: z.string().optional().default("16:9"),
+    resolution: z.enum(["1K", "2K", "4K"]).optional().default("1K"),
   }),
   execute: async ({ context }) => {
-    const result = await fal.subscribe("fal-ai/alpha-image-232/edit-image", {
-      input: context
-    });
+    const { prompt, image_urls = [], aspect_ratio, resolution } = context;
+    const input: any = { prompt, num_images: 1, aspect_ratio, resolution, output_format: "png" };
+    const endpoint = image_urls.length ? "fal-ai/nano-banana-pro/edit" : "fal-ai/nano-banana-pro";
+    if (image_urls.length) input.image_urls = image_urls;
+
+    const result = await fal.subscribe(endpoint, { input });
     return { url: result.data.images[0].url };
   }
 });
@@ -123,7 +129,7 @@ export const imageGenerationTool = createTool({
 | P03 | ContentAnalysisAgent and onboarding | Not Started | ❌ Not Implemented |
 | P04 | CardQueryAgent and CardAnswerAgent | Not Started | ❌ Not Implemented |
 | P05 | SafetyAgent and ImageBriefAgent | Not Started | ❌ Not Implemented |
-| P06 | ImageGenerationTool with FLUX 2 | Not Started | ⚠️ Wrong model (Schnell) |
+| P06 | ImageGenerationTool with Nano Banana Pro | Not Started | ⚠️ Wrong model (legacy prototype) |
 | P07 | CardGenerationWorkflow | Not Started | ❌ Not Implemented |
 | P08 | Backend REST API endpoints | Not Started | ❌ Not Implemented |
 | P09 | React frontend core flows | Not Started | ✅ Complete (direct Mastra calls) |
@@ -153,7 +159,7 @@ The execution plan document (`wisdom-pixels-execution-plan-v2.md`) defines new p
 2. ❌ No specialized agents (1 generic vs. 5 specialized)
 3. ❌ No workflow orchestration
 4. ❌ No backend REST API (frontend calls Mastra directly)
-5. ❌ Wrong FLUX model (Schnell vs. alpha-image-232)
+5. ❌ Wrong image model (non-Nano Banana Pro vs. nano-banana-pro/edit)
 6. ❌ Wrong tools (content generators vs. infrastructure)
 
 ### Technical Debt Items
@@ -161,7 +167,7 @@ The execution plan document (`wisdom-pixels-execution-plan-v2.md`) defines new p
 | Item | Impact | Resolution Phase |
 |------|--------|-----------------|
 | Direct frontend-to-Mastra calls | Violates PRD architecture | M5: REST API layer |
-| Wrong FLUX model | Can't use reference images | M2: ImageGenerationTool |
+| Wrong image model | Can't use reference images | M2: ImageGenerationTool |
 | No database | Can't persist data | M1: Database foundation |
 | 1 agent vs. 5 | Poor separation of concerns | M3: Specialized agents |
 | No workflows | No orchestration | M4: Workflows |
@@ -303,7 +309,7 @@ export const cards = sqliteTable("cards", {
 | TEST-104 | 95% workflow success | ❌ Not created | Create in M7 |
 | TEST-201 | All REST endpoints | ❌ Not created | Create in M7 |
 | TEST-301-308 | Data validation | ❌ Not created | Create in M7 |
-| TEST-501-502 | FLUX tool tests | ❌ Not created | Create in M7 |
+| TEST-501-502 | Image tool tests (Nano Banana Pro) | ❌ Not created | Create in M7 |
 
 ### Current Test Files
 
@@ -409,7 +415,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 # ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 # === Image Generation ===
-FAL_KEY=your_fal_key_here  # Required for FLUX 2 image generation
+FAL_KEY=your_fal_key_here  # Required for Nano Banana Pro image generation
 
 # === Database ===
 DATABASE_URL=file:./data/wisdom-pixels.db  # LibSQL/SQLite file path
@@ -547,7 +553,7 @@ These combine LLM generation + logic in one tool. This violates the PRD architec
 
 ---
 
-## 14. Appendix: FLUX Model Research
+## 14. Appendix: Nano Banana Pro Model Research
 
 ### fal.ai Model Availability Check
 

@@ -7,9 +7,18 @@ interface CardGalleryProps {
   influencers: Influencer[];
   personas: Persona[];
   onImageClick?: (url: string) => void;
+  selectedIds?: Set<string>;
+  onToggleSelected?: (cardId: string) => void;
 }
 
-export default function CardGallery({ cards, influencers, personas, onImageClick }: CardGalleryProps) {
+export default function CardGallery({
+  cards,
+  influencers,
+  personas,
+  onImageClick,
+  selectedIds,
+  onToggleSelected,
+}: CardGalleryProps) {
   const navigate = useNavigate();
   const [influencerFilter, setInfluencerFilter] = useState('all');
   const [personaFilter, setPersonaFilter] = useState('all');
@@ -78,7 +87,7 @@ export default function CardGallery({ cards, influencers, personas, onImageClick
           </select>
         </div>
 
-        <div style={{ marginLeft: 'auto', color: '#6c757d' }}>
+        <div style={{ marginLeft: 'auto', color: '#6c757d', textAlign: 'right' }}>
           Showing {filteredCards.length} of {cards.length} cards
         </div>
       </div>
@@ -121,12 +130,30 @@ export default function CardGallery({ cards, influencers, personas, onImageClick
                   onImageClick?.(card.imageUrl);
                 }}
               />
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0.5rem', background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%)', color: 'white', fontSize: '0.85rem' }}>
-                {card.imageBrief}
-              </div>
             </div>
 
             <div style={{ padding: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+                  onClick={(e) => {
+                    // Prevent clicking the "Select" label from opening the card
+                    e.stopPropagation();
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds?.has(card.cardId) ?? false}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      onToggleSelected?.(card.cardId);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '0.8rem', color: '#495057' }}>Select</span>
+                </label>
+              </div>
+
               <div
                 data-testid="card-influencer"
                 style={{
@@ -175,17 +202,27 @@ export default function CardGallery({ cards, influencers, personas, onImageClick
                 {card.response}
               </div>
 
-              <div style={{
-                marginTop: '0.75rem',
-                padding: '0.25rem 0.75rem',
-                background: card.status === 'published' ? '#d4edda' : '#f8d7da',
-                color: card.status === 'published' ? '#155724' : '#721c24',
-                borderRadius: '12px',
-                fontSize: '0.75rem',
-                display: 'inline-block'
-              }}>
-                {card.status}
-              </div>
+              {(() => {
+                const isPublished = String(card.status).toLowerCase() === 'published';
+                const label = isPublished ? 'Published' : 'Draft';
+                const background = isPublished ? '#d4edda' : '#f8d7da';
+                const color = isPublished ? '#155724' : '#721c24';
+                return (
+                  <div
+                    style={{
+                      marginTop: '0.75rem',
+                      padding: '0.25rem 0.75rem',
+                      background,
+                      color,
+                      borderRadius: '12px',
+                      fontSize: '0.75rem',
+                      display: 'inline-block',
+                    }}
+                  >
+                    {label}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ))}

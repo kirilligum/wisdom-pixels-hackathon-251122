@@ -49,8 +49,14 @@ export const dbTool = createTool({
     error: z.string().optional(),
   }),
   execute: async (input: any) => {
-    const operation = input.operation;
-    const params = input.params || {};
+    // Support both direct input ({ operation, params }) and
+    // Mastra tool context shape ({ context: { operation, params } })
+    const payload = input && typeof input === 'object' && 'context' in input
+      ? (input as any).context
+      : input;
+
+    const operation = payload.operation;
+    const params = payload.params || {};
     const p = params as Record<string, any>;
 
     try {

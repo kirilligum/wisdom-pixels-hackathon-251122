@@ -1,7 +1,8 @@
+import type { CSSProperties } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 
 export default function AppLayout() {
-  const headerStyle = {
+  const headerStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -13,7 +14,7 @@ export default function AppLayout() {
     zIndex: 10,
   };
 
-  const iconButtonStyle = {
+  const iconButtonStyle: CSSProperties = {
     width: '32px',
     height: '32px',
     borderRadius: '50%',

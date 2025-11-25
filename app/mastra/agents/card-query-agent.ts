@@ -29,10 +29,10 @@ Generate a question that a customer (persona) might ask about the brand/product,
 4. Natural, conversational tone (not corporate/salesy)
 5. Focus on practical benefits, use cases, or real experiences
 
-**Example Good Questions**:
-- "What does Sarah Chen think makes FlowForm better than other project management tools?"
-- "How does Marcus Johnson help remote teams stay connected with FlowForm?"
-- "Why does Dr. Emily Rodriguez recommend FlowForm for team psychology?"
+**Example Good Questions (Motion Suit)**:
+- "What does Jordan Lee think makes the FlowForm Motion Suit better than just watching my form in a mirror?"
+- "How does Priya Nair use the FlowForm Motion Suit to keep her hips and back happy on long content-editing days?"
+- "Why does Dr. Mira Solis recommend the FlowForm Motion Suit for people with desk-body stiffness?"
 
 **Example Bad Questions** (avoid these):
 - "What is FlowForm?" (too generic, no influencer mention)

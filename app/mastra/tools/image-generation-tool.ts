@@ -2,21 +2,44 @@ import { createTool } from '@mastra/core';
 import { z } from 'zod';
 
 /**
- * ImageGenerationTool - Generates images using FLUX alpha-image-232/edit-image
- * Supports reference images for consistent influencer appearance
- * REQ-201: All cards must have non-empty imageUrl from FLUX
- * REQ-204: Images should use influencer reference images
+ * ImageGenerationTool - Generates images using fal-ai/nano-banana-pro models
+ * Uses:
+ *   - fal-ai/nano-banana-pro         for text-to-image
+ *   - fal-ai/nano-banana-pro/edit    for image-to-image with reference images
+ *
+ * REQ-305: All cards must have non-empty imageUrl from the image generator
+ * REQ-209: Calls fal.subscribe with Nano Banana Pro endpoints
  */
 
 export const imageGenerationTool = createTool({
   id: 'image-generation',
-  description: 'Generate branded product images using FLUX alpha-image-232/edit-image model with influencer reference images',
+  description:
+    'Generate branded product images using fal-ai/nano-banana-pro (text) and fal-ai/nano-banana-pro/edit (image edit) with optional reference images',
   inputSchema: z.object({
     prompt: z.string().describe('Detailed image generation prompt'),
-    referenceImageUrls: z.array(z.string().url()).optional().describe('Reference images for consistent appearance (e.g., influencer photos)'),
-    imageSize: z.enum(['square', 'square_hd', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']).optional().default('landscape_4_3'),
-    numInferenceSteps: z.number().min(1).max(50).optional().default(28),
-    guidanceScale: z.number().min(1).max(20).optional().default(3.5),
+    referenceImageUrls: z
+      .array(z.string().url())
+      .optional()
+      .describe('Reference images for consistent appearance (e.g., influencer photos)'),
+    imageSize: z
+      .enum(['square', 'square_hd', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9'])
+      .optional()
+      .default('landscape_4_3')
+      .describe('Logical size hint mapped to Nano Banana aspect_ratio'),
+    numInferenceSteps: z
+      .number()
+      .min(1)
+      .max(50)
+      .optional()
+      .default(28)
+      .describe('Kept for backward compatibility; not used by Nano Banana Pro'),
+    guidanceScale: z
+      .number()
+      .min(1)
+      .max(20)
+      .optional()
+      .default(3.5)
+      .describe('Kept for backward compatibility; not used by Nano Banana Pro'),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -26,56 +49,76 @@ export const imageGenerationTool = createTool({
     contentType: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
+  execute: async (input: any) => {
+    // Support both direct input (matching inputSchema) and
+    // Mastra tool context shape ({ context: ... })
+    const context = input && typeof input === 'object' && 'context' in input
+      ? (input as any).context
+      : input;
+
     const {
       prompt,
       referenceImageUrls = [],
       imageSize = 'landscape_4_3',
-      numInferenceSteps = 28,
-      guidanceScale = 3.5,
+      // numInferenceSteps and guidanceScale are accepted but not forwarded to Nano Banana Pro
     } = context;
 
     try {
-      // Check for FAL_KEY or FALAI_API_KEY in environment
       const falKey = process.env.FAL_KEY || process.env.FALAI_API_KEY;
       if (!falKey) {
         return {
           success: false,
-          error: 'FAL_KEY or FALAI_API_KEY environment variable is not set. Please configure your fal.ai API key.',
+          error:
+            'FAL_KEY or FALAI_API_KEY environment variable is not set. Please configure your fal.ai API key.',
         };
       }
 
-      // Import fal.ai dynamically
       const { fal } = await import('@fal-ai/client');
       fal.config({ credentials: falKey });
 
-      // Prepare input for alpha-image-232/edit-image
+      const aspectRatio = (() => {
+        switch (imageSize) {
+          case 'square':
+          case 'square_hd':
+            return '1:1';
+          case 'portrait_4_3':
+            return '3:4';
+          case 'portrait_16_9':
+            return '9:16';
+          case 'landscape_4_3':
+            return '4:3';
+          case 'landscape_16_9':
+          default:
+            return '16:9';
+        }
+      })();
+
       const input: any = {
         prompt,
-        image_size: imageSize,
-        num_inference_steps: numInferenceSteps,
-        guidance_scale: guidanceScale,
         num_images: 1,
-        enable_safety_checker: true,
+        aspect_ratio: aspectRatio,
+        output_format: 'png',
+        resolution: '1K',
       };
 
-      // Add reference images if provided (key feature of alpha-image-232/edit-image)
-      if (referenceImageUrls.length > 0) {
+      const hasReferenceImages = referenceImageUrls.length > 0;
+      const endpoint = hasReferenceImages ? 'fal-ai/nano-banana-pro/edit' : 'fal-ai/nano-banana-pro';
+
+      if (hasReferenceImages) {
         input.image_urls = referenceImageUrls;
       }
 
-      // Call FLUX alpha-image-232/edit-image model
-      const result: any = await fal.subscribe('fal-ai/alpha-image-232/edit-image', {
+      const result: any = await fal.subscribe(endpoint, {
         input,
         logs: false,
       });
 
-      // Extract generated image
       if (result?.data?.images && result.data.images.length > 0) {
         const image = result.data.images[0];
         return {
           success: true,
           imageUrl: image.url,
+          // Nano Banana Pro response schema includes file_name/content_type; width/height may be undefined
           width: image.width,
           height: image.height,
           contentType: image.content_type,
@@ -84,7 +127,7 @@ export const imageGenerationTool = createTool({
 
       return {
         success: false,
-        error: 'No image generated. FLUX returned empty result.',
+        error: 'No image generated. Nano Banana Pro returned an empty result.',
       };
     } catch (error) {
       return {

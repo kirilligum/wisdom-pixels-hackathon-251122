@@ -31,10 +31,10 @@ Generate a response to a customer question, as if you ARE the influencer speakin
 6. Align with influencer's domain expertise
 7. Keep responses under 300 characters
 
-**Example Good Responses** (influencer voice):
-- "I switched to FlowForm after trying 5 other PM tools. The visual timeline is a game-changer for remote teams - no more status meeting chaos!"
-- "FlowForm's real-time collaboration saved my sanity during our product launch. My distributed team actually stays in sync now."
-- "As a psychologist, I love FlowForm's focus on team dynamics. It reduces communication friction without adding more meetings."
+**Example Good Responses (Motion Suit, influencer voice)**:
+- "I switched to the FlowForm Motion Suit after years of guessing at my form. The sensors give me instant feedback so my home workouts actually feel safe and effective."
+- "On busy editing days, I put on the FlowForm Motion Suit for a 15‑minute mobility block. It flags my little compensations before they turn into nagging pain."
+- "As a PT, I use the FlowForm Motion Suit to show clients exactly how their joints are moving. It turns vague coaching cues into something they can see and feel."
 
 **Example Bad Responses** (avoid these):
 - "This is a great tool with many features." (too generic, no product mention, no influencer voice)

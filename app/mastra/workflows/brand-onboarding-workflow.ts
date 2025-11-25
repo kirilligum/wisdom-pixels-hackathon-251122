@@ -1,5 +1,8 @@
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
+import { urlSlugTool } from '../tools/url-slug-tool';
+import { dbTool } from '../tools/db-tool';
+import { contentAnalysisAgent } from '../agents/content-analysis-agent';
 
 /**
  * BrandOnboardingWorkflow - Onboards a new brand with content analysis
@@ -29,21 +32,19 @@ const generateSlugStep = createStep({
   outputSchema: z.object({
     urlSlug: z.string(),
   }),
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData }) => {
     const { brandName } = inputData;
 
-    const urlSlugTool = mastra.getTool('url-slug');
     const result = await urlSlugTool.execute({
-      context: { brandName },
-      runtimeContext: {},
+      text: brandName,
     });
 
-    if (!result.success) {
+    if (!result.success || !result.slug) {
       throw new Error(`Failed to generate slug: ${result.error}`);
     }
 
     return {
-      urlSlug: result.urlSlug,
+      urlSlug: result.slug,
     };
   },
 });
@@ -61,29 +62,25 @@ const createBrandStep = createStep({
   outputSchema: z.object({
     brandId: z.string(),
   }),
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData }) => {
     const { brandName, domain, contentSources, urlSlug } = inputData;
 
-    const dbTool = mastra.getTool('db');
     const result = await dbTool.execute({
-      context: {
-        operation: 'createBrand',
-        params: {
-          name: brandName,
-          domain,
-          urlSlug,
-          contentSources,
-        },
+      operation: 'createBrand',
+      params: {
+        name: brandName,
+        domain,
+        urlSlug,
+        contentSources,
       },
-      runtimeContext: {},
     });
 
-    if (!result.success) {
+    if (!result.success || !result.data) {
       throw new Error(`Failed to create brand: ${result.error}`);
     }
 
     return {
-      brandId: result.brand.id,
+      brandId: result.data.brandId,
     };
   },
 });
@@ -111,10 +108,8 @@ const analyzeContentStep = createStep({
       tags: z.array(z.string()),
     })),
   }),
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData }) => {
     const { brandId, brandName, domain, contentSources } = inputData;
-
-    const contentAnalysisAgent = mastra.getAgent('contentAnalysisAgent');
 
     // Fetch content from first source (could be extended to analyze multiple sources)
     const contentSource = contentSources[0] || `https://${domain}`;
@@ -190,31 +185,27 @@ const savePersonasStep = createStep({
   outputSchema: z.object({
     personaIds: z.array(z.string()),
   }),
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData }) => {
     const { brandId, personas } = inputData;
 
-    const dbTool = mastra.getTool('db');
     const personaIds: string[] = [];
 
     for (const persona of personas) {
       const result = await dbTool.execute({
-        context: {
-          operation: 'createPersona',
-          params: {
-            brandId,
-            label: persona.label,
-            description: persona.description,
-            tags: persona.tags,
-          },
+        operation: 'createPersona',
+        params: {
+          brandId,
+          label: persona.label,
+          description: persona.description,
+          tags: persona.tags,
         },
-        runtimeContext: {},
       });
 
-      if (!result.success) {
+      if (!result.success || !result.data) {
         throw new Error(`Failed to save persona "${persona.label}": ${result.error}`);
       }
 
-      personaIds.push(result.persona.id);
+      personaIds.push(result.data.personaId);
     }
 
     return {
@@ -238,31 +229,27 @@ const saveEnvironmentsStep = createStep({
   outputSchema: z.object({
     environmentIds: z.array(z.string()),
   }),
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData }) => {
     const { brandId, environments } = inputData;
 
-    const dbTool = mastra.getTool('db');
     const environmentIds: string[] = [];
 
     for (const environment of environments) {
       const result = await dbTool.execute({
-        context: {
-          operation: 'createEnvironment',
-          params: {
-            brandId,
-            label: environment.label,
-            description: environment.description,
-            tags: environment.tags,
-          },
+        operation: 'createEnvironment',
+        params: {
+          brandId,
+          label: environment.label,
+          description: environment.description,
+          tags: environment.tags,
         },
-        runtimeContext: {},
       });
 
-      if (!result.success) {
+      if (!result.success || !result.data) {
         throw new Error(`Failed to save environment "${environment.label}": ${result.error}`);
       }
 
-      environmentIds.push(result.environment.id);
+      environmentIds.push(result.data.environmentId);
     }
 
     return {

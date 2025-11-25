@@ -1,17 +1,17 @@
 # Wisdom Pixels - AI-Powered Training Card Platform
 
-**Hackathon Project**: Mastra + FLUX 2.0 Integration
-**Tech Stack**: React 19 + TypeScript + Vite + Mastra + fal.ai FLUX + Drizzle ORM + SQLite
+**Hackathon Project**: Mastra + Nano Banana Pro Integration
+**Tech Stack**: React 19 + TypeScript + Vite + Mastra + fal.ai Nano Banana Pro + Drizzle ORM + SQLite
 
 ---
 
 ## 🎯 Project Overview
 
-Wisdom Pixels is an agentic AI platform that generates branded training cards featuring influencer endorsements and photorealistic images. The system uses **Mastra's multi-agent framework** to orchestrate content generation, with **FLUX alpha-image-232/edit-image** for consistent influencer appearance via reference images.
+Wisdom Pixels is an agentic AI platform that generates branded training cards featuring influencer endorsements and photorealistic images. The system uses **Mastra's multi-agent framework** to orchestrate content generation, with **fal-ai/nano-banana-pro** and **fal-ai/nano-banana-pro/edit** for consistent influencer appearance via reference images.
 
 ### Key Innovation
 - **5 Specialized AI Agents** working together through **3 orchestrated workflows**
-- **Reference-based image generation** using FLUX's alpha-image-232/edit-image model
+- **Reference-based image generation** using fal.ai Nano Banana Pro (text + edit models)
 - **Full database persistence** with foreign key constraints and workflow tracking
 - **47 Playwright E2E tests** covering the complete user journey
 
@@ -58,7 +58,7 @@ Wisdom Pixels is an agentic AI platform that generates branded training cards fe
 │  ┌─────────────┐  ┌────────────────┐  ┌────────────────────┐  │
 │  │   DbTool    │  │ ContentFetcher │  │ ImageGeneration    │  │
 │  │             │  │     Tool       │  │      Tool          │  │
-│  │ (CRUD Ops)  │  │  (URL Fetch)   │  │ (FLUX + refs)      │  │
+│  │ (CRUD Ops)  │  │  (URL Fetch)   │  │ (Nano Banana + refs)│ │
 │  └─────────────┘  └────────────────┘  └────────────────────┘  │
 │  ┌─────────────┐                                                 │
 │  │ UrlSlugTool │                                                 │
@@ -84,7 +84,7 @@ Wisdom Pixels is an agentic AI platform that generates branded training cards fe
 │                    EXTERNAL SERVICES                              │
 │                                                                    │
 │  ┌──────────────────┐    ┌────────────────────┐                 │
-│  │  fal.ai FLUX     │    │  OpenAI / Claude   │                 │
+│  │  fal.ai Nano Banana Pro │ │  OpenAI / Claude   │                 │
 │  │  alpha-image-232 │    │  (LLM for agents)  │                 │
 │  │  /edit-image     │    │                    │                 │
 │  └──────────────────┘    └────────────────────┘                 │
@@ -201,7 +201,7 @@ mastra/db/
    - HTML tag stripping for clean text extraction
    - Used by ContentAnalysisAgent for brand schema extraction
 
-3. **ImageGenerationTool**: FLUX alpha-image-232/edit-image integration
+3. **ImageGenerationTool**: fal-ai/nano-banana-pro and fal-ai/nano-banana-pro/edit integration
    - **Key Feature**: Supports `referenceImageUrls[]` for consistent appearance
    - Configurable image sizes, steps, guidance scale
    - Used by ImageBriefAgent to generate product photos
@@ -284,7 +284,7 @@ mastra/db/
 - **Drizzle Kit 0.31.7** for migrations
 
 ### AI Services
-- **fal.ai FLUX alpha-image-232/edit-image** for image generation
+- **fal.ai Nano Banana Pro (text + edit)** for image generation
 - **@fal-ai/client 1.7.2** for API integration
 
 ### Testing
@@ -410,7 +410,7 @@ npm run test:m2       # Phase M2 tool tests
    - Each agent has focused responsibility (separation of concerns)
    - Agents collaborate through shared database context
 
-### 2. **FLUX alpha-image-232/edit-image Integration**
+### 2. **Nano Banana Pro Integration**
    - **Reference image support** via `image_urls[]` parameter
    - Maintains consistent influencer appearance across cards
    - Photorealistic product placement
@@ -457,7 +457,7 @@ npm run test:m2       # Phase M2 tool tests
 - **Testable**: Easy to mock agents and tools in tests
 - **Flexible**: Works with OpenAI, Claude, Gemini, etc.
 
-### Why FLUX alpha-image-232/edit-image?
+### Why Nano Banana Pro?
 - **Reference images**: Can provide influencer photos for consistency
 - **Photorealistic**: Better than DALL-E 3 for product placement
 - **Fast**: ~28 inference steps for production quality
@@ -475,7 +475,7 @@ npm run test:m2       # Phase M2 tool tests
 ### ✅ **Technical Complexity**
 - Multi-agent orchestration with Mastra
 - Database persistence with foreign keys
-- FLUX model integration with reference images
+- Nano Banana Pro integration with optional reference images
 - 99 automated tests across 3 testing tiers
 
 ### ✅ **Innovation**
@@ -508,7 +508,7 @@ npm run test:m2       # Phase M2 tool tests
 
 This is a hackathon project. For production use, consider:
 - Adding authentication and authorization
-- Implementing rate limiting for LLM/FLUX APIs
+- Implementing rate limiting for LLM/image APIs
 - Adding Redis for caching LLM responses
 - Deploying to Vercel (frontend) + Railway (Mastra)
 
@@ -520,4 +520,4 @@ MIT
 
 ---
 
-**Built with** ❤️ **using Mastra, FLUX, React, and TypeScript**
+**Built with** ❤️ **using Mastra, Nano Banana Pro, React, and TypeScript**

@@ -3,6 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { BrandData, Persona, Environment, Influencer, Card } from '../types';
 import CardGallery from '../components/CardGallery';
 import { apiClient } from '../lib/api-client';
+import flowformSeed from '../data/flowform-seed.json';
+import { useSelectionFilter } from '../hooks/useSelectionFilter';
+import { SelectionFilterToolbar } from '../components/SelectionFilterToolbar';
 
 type TabType = 'product' | 'influencers' | 'cards';
 
@@ -13,17 +16,16 @@ const MetricPill = ({ label, value }: { label: string; value: string }) => (
 );
 
 export default function BrandDashboard() {
-  const { brandId } = useParams<{ brandId: string }>();
+  const { brandId, tab } = useParams<{ brandId: string; tab?: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('product');
+  const initialTab: TabType =
+    tab === 'influencers' || tab === 'cards' || tab === 'publish' ? (tab as TabType) : 'product';
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [data, setData] = useState<BrandData | null>(null);
-  const [influencerStates, setInfluencerStates] = useState<Record<string, { enabled: boolean; isDefault: boolean }>>({});
+  const [influencerStates, setInfluencerStates] = useState<Record<string, { enabled: boolean }>>({});
   const [cardStatuses, setCardStatuses] = useState<Record<string, 'draft' | 'ready' | 'published'>>({});
-  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [influencerSearch, setInfluencerSearch] = useState('');
-  const [cardSearch, setCardSearch] = useState('');
   const [selectedInfluencer, setSelectedInfluencer] = useState<Influencer | null>(null);
   const [gallery, setGallery] = useState<{ headshot: string; actionImages: string[] } | null>(null);
   const [galleryLoading, setGalleryLoading] = useState(false);
@@ -32,6 +34,80 @@ export default function BrandDashboard() {
   const [brandProductImages, setBrandProductImages] = useState<string[]>([]);
   const [isGeneratingDataset, setIsGeneratingDataset] = useState(false);
   const [datasetUrl, setDatasetUrl] = useState<string | null>(null);
+  const [generationSummary, setGenerationSummary] = useState<{
+    totalGenerated: number;
+    totalSkipped: number;
+    totalCards: number;
+    totalWithImages: number;
+    message?: string;
+  } | null>(null);
+
+  // Reusable selection + filter for influencers (by text)
+  const {
+    searchTerm: influencerSearch,
+    setSearchTerm: setInfluencerSearch,
+    filtered: filteredInfluencers,
+    selectedKeys: selectedInfluencerIds,
+    toggleSelection: toggleInfluencerSelection,
+    selectAll: selectAllInfluencers,
+    clearSelection: clearInfluencerSelection,
+  } = useSelectionFilter<Influencer, string>(
+    data?.influencers || [],
+    (inf) => inf.influencerId,
+    (inf, rawNeedle) => {
+      const needle = rawNeedle.toLowerCase();
+      return (
+        inf.name.toLowerCase().includes(needle) ||
+        inf.domain.toLowerCase().includes(needle) ||
+        inf.bio.toLowerCase().includes(needle)
+      );
+    },
+  );
+
+  // Reusable selection + filter for cards in the Publish tab
+  const {
+    searchTerm: cardSearch,
+    setSearchTerm: setCardSearch,
+    filtered: filteredCards,
+    selectedKeys: selectedCards,
+    toggleSelection: toggleCardSelection,
+    selectAll: selectAllCards,
+    clearSelection: clearCardSelection,
+  } = useSelectionFilter<Card, string>(
+    data?.cards || [],
+    (card) => card.cardId,
+    (card, rawNeedle) => {
+      const term = rawNeedle.trim();
+      const haystacks = [
+        card.query,
+        card.response,
+        card.cardId,
+      ];
+
+      // If term looks like a regex, try to use it
+      try {
+        const re = new RegExp(term, 'i');
+        return haystacks.some((h) => re.test(h));
+      } catch {
+        const needle = term.toLowerCase();
+        return haystacks.some((h) => h.toLowerCase().includes(needle));
+      }
+    },
+  );
+
+  // Cards used in the Publish tab – reuse the same filtered list but
+  // sort so that drafts/ready cards appear before published ones.
+  // (Publish tab removed; keep filteredCards as the single source of truth.)
+
+  // Keep activeTab in sync with URL segment so that /brand/:brandId/:tab
+  // is the source of truth for which section is active.
+  useEffect(() => {
+    const nextTab: TabType =
+      tab === 'influencers' || tab === 'cards' ? (tab as TabType) : 'product';
+    if (nextTab !== activeTab) {
+      setActiveTab(nextTab);
+    }
+  }, [tab, activeTab]);
 
   useEffect(() => {
     const load = async () => {
@@ -62,6 +138,11 @@ export default function BrandDashboard() {
           return;
         }
 
+        // For the FlowForm demo brand, always fall back to local seed data
+        if (brandId === 'flowform') {
+          throw new Error('__FLOWFORM_SEED_ONLY__');
+        }
+
         let brandRes;
         try {
           brandRes = await apiClient.getBrand(resolvedId);
@@ -85,139 +166,21 @@ export default function BrandDashboard() {
           apiClient.getInfluencers(),
         ]);
 
-        let influencers = influencersRes.influencers || [];
-        let cards = cardsRes.cards || [];
-
-        // For the FlowForm demo, if there are no influencers/cards, fall back to placeholder influencers/cards
-        const isFlowForm = brandRes.brand.urlSlug === 'flowform';
-        if (isFlowForm) {
-          // Ensure Jordan Lee placeholder exists
-          if (!influencers.some((inf) => inf.name === 'Jordan Lee')) {
-            try {
-              const resp = await fetch('/json/jordan_lee.json');
-              if (resp.ok) {
-                const j = (await resp.json()) as any;
-                const placeholderJordan: Influencer = {
-                  influencerId: 'placeholder-jordan-lee',
-                  name: j.name || 'Jordan Lee',
-                  bio: j.bio || 'Strength & conditioning coach focused on wearable-driven training plans.',
-                  domain: j.domain || 'Strength & Conditioning',
-                  imageUrl: '/images/jordan_lee/influencers/influencer_jordan_lee_protrait.png',
-                  actionImageUrls: [
-                    '/images/jordan_lee/influencers/influencer_jordan_lee_1.png',
-                    '/images/jordan_lee/influencers/influencer_jordan_lee_2.png',
-                  ],
-                  enabled: true,
-                };
-                influencers = [placeholderJordan, ...influencers];
-              }
-            } catch {
-              // ignore placeholder failure
-            }
-          }
-
-          // Ensure Priya Nair placeholder exists
-          if (!influencers.some((inf) => inf.name === 'Priya Nair')) {
-            try {
-              const resp = await fetch('/json/priya_nair.json');
-              if (resp.ok) {
-                const p = (await resp.json()) as any;
-                const placeholderPriya: Influencer = {
-                  influencerId: 'placeholder-priya-nair',
-                  name: p.name || 'Priya Nair',
-                  bio: p.bio || 'Fitness content creator specializing in mobility and injury prevention.',
-                  domain: p.domain || 'Mobility & Recovery',
-                  imageUrl: '/images/priya_nair/influencers/Priya Nair portrait.png',
-                  actionImageUrls: [
-                    '/images/priya_nair/influencers/Priya Nair 1.png',
-                    '/images/priya_nair/influencers/Priya Nair 2.png',
-                  ],
-                  enabled: true,
-                };
-                influencers = [placeholderPriya, ...influencers];
-              }
-            } catch {
-              // ignore placeholder failure
-            }
-          }
-
-          // If there are no cards yet, hydrate demo cards for both Jordan and Priya
-          if (cards.length === 0) {
-            const demoCards: Card[] = [];
-            try {
-              const respJordan = await fetch('/json/jordan_lee_cards.json');
-              if (respJordan.ok) {
-                const json = (await respJordan.json()) as any[];
-                demoCards.push(
-                  ...json.map(
-                    (c) =>
-                      ({
-                        cardId: c.id,
-                        brandId: brandRes.brand.brandId,
-                        influencerId: 'placeholder-jordan-lee',
-                        personaId: null,
-                        environmentId: null,
-                        query: c.query,
-                        response: c.response,
-                        imageUrl: c.imageUrl,
-                        imageBrief: c.imageBrief,
-                        status: 'draft',
-                      } as Card),
-                  ),
-                );
-              }
-            } catch {
-              // ignore placeholder failure
-            }
-
-            try {
-              const respPriya = await fetch('/json/priya_nair_cards.json');
-              if (respPriya.ok) {
-                const json = (await respPriya.json()) as any[];
-                demoCards.push(
-                  ...json.map(
-                    (c) =>
-                      ({
-                        cardId: c.id,
-                        brandId: brandRes.brand.brandId,
-                        influencerId: 'placeholder-priya-nair',
-                        personaId: null,
-                        environmentId: null,
-                        query: c.query,
-                        response: c.response,
-                        imageUrl: c.imageUrl,
-                        imageBrief: c.imageBrief,
-                        status: 'draft',
-                      } as Card),
-                  ),
-                );
-              }
-            } catch {
-              // ignore placeholder failure
-            }
-
-            if (demoCards.length > 0) {
-              cards = demoCards;
-            }
-          }
-        }
-
         const brandData: BrandData = {
           brand: brandRes.brand,
           personas: personasRes.personas,
           environments: environmentsRes.environments,
-          influencers,
-          cards,
+          influencers: influencersRes.influencers || [],
+          cards: cardsRes.cards || [],
         };
 
         setData(brandData);
         setBrandProductImages(brandData.brand.productImages ?? []);
 
-        const initialStates: Record<string, { enabled: boolean; isDefault: boolean }> = {};
+        const initialStates: Record<string, { enabled: boolean }> = {};
         brandData.influencers.forEach((inf) => {
           initialStates[inf.influencerId] = {
             enabled: inf.enabled,
-            isDefault: false,
           };
         });
         setInfluencerStates(initialStates);
@@ -228,7 +191,82 @@ export default function BrandDashboard() {
         });
         setCardStatuses(initialCardStatuses);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load brand data');
+        const shouldFallbackToSeed = !brandId || brandId === 'flowform';
+        if (shouldFallbackToSeed) {
+          try {
+            const seed: any = flowformSeed;
+
+            const brandData: BrandData = {
+              brand: {
+                brandId: seed.brand.id,
+                name: seed.brand.name,
+                domain: seed.brand.domain,
+                description: seed.brand.description,
+                productImages: seed.brand.productImages ?? [],
+                contentSources: seed.brand.contentSources ?? [],
+                urlSlug: 'flowform',
+              },
+              personas: (seed.personas || []).map((p: any) => ({
+                personaId: p.id,
+                brandId: p.brandId,
+                label: p.label,
+                description: p.description,
+                tags: p.tags ?? [],
+              })),
+              environments: (seed.environments || []).map((env: any) => ({
+                environmentId: env.id,
+                brandId: env.brandId,
+                label: env.label,
+                description: env.description,
+                tags: env.type ? [env.type] : [],
+              })),
+              influencers: (seed.influencers || []).slice(0, 5).map((inf: any) => ({
+                influencerId: inf.id,
+                name: inf.name,
+                bio: `${inf.role}: ${inf.bioShort} (Age ${inf.ageRange})`,
+                domain: inf.role,
+                imageUrl: inf.imageUrl,
+                actionImageUrls: [],
+                enabled: inf.enabled ?? true,
+              })),
+              cards: (seed.cards || []).map((c: any) => ({
+                cardId: c.id,
+                brandId: c.brandId,
+                personaId: c.personaId ?? null,
+                influencerId: c.influencerId,
+                environmentId: c.environmentId ?? null,
+                query: c.query,
+                response: c.response,
+                imageUrl: c.imageUrl,
+                imageBrief: c.imageBrief ?? '',
+                status: (c.status as 'draft' | 'published' | string) ?? 'draft',
+                viewCount: c.viewCount ?? 0,
+              })),
+            };
+
+            setData(brandData);
+            setBrandProductImages(brandData.brand.productImages ?? []);
+
+            const initialStates: Record<string, { enabled: boolean }> = {};
+            brandData.influencers.forEach((inf) => {
+              initialStates[inf.influencerId] = {
+                enabled: inf.enabled,
+              };
+            });
+            setInfluencerStates(initialStates);
+
+            const initialCardStatuses: Record<string, 'draft' | 'ready' | 'published'> = {};
+            brandData.cards.forEach((card) => {
+              initialCardStatuses[card.cardId] = (card.status as 'draft' | 'ready' | 'published') ?? 'draft';
+            });
+            setCardStatuses(initialCardStatuses);
+            setError(null);
+          } catch (seedError) {
+            setError(seedError instanceof Error ? seedError.message : 'Failed to load brand data');
+          }
+        } else {
+          setError(e instanceof Error ? e.message : 'Failed to load brand data');
+        }
       } finally {
         setLoading(false);
       }
@@ -256,9 +294,9 @@ export default function BrandDashboard() {
     try {
       const { influencers } = await apiClient.findNewInfluencers();
       // rebuild influencer state
-      const nextStates: Record<string, { enabled: boolean; isDefault: boolean }> = {};
+      const nextStates: Record<string, { enabled: boolean }> = {};
       influencers.forEach(inf => {
-        nextStates[inf.influencerId] = { enabled: inf.enabled, isDefault: false };
+        nextStates[inf.influencerId] = { enabled: inf.enabled };
       });
       setInfluencerStates(nextStates);
       setData(prev => prev ? { ...prev, influencers } : prev);
@@ -267,13 +305,106 @@ export default function BrandDashboard() {
     }
   };
 
+  const handleActivateSelectedInfluencers = async () => {
+    if (!data) return;
+    const ids = Array.from(selectedInfluencerIds);
+    if (ids.length === 0) return;
+    try {
+      await Promise.all(ids.map(id => apiClient.updateInfluencerEnabled(id, true)));
+      setInfluencerStates(prev => {
+        const next: Record<string, { enabled: boolean }> = { ...prev };
+        ids.forEach(id => {
+          next[id] = {
+            ...(next[id] || { enabled: true }),
+            enabled: true,
+          };
+        });
+        return next;
+      });
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              influencers: prev.influencers.map(inf =>
+                ids.includes(inf.influencerId) ? { ...inf, enabled: true } : inf,
+              ),
+            }
+          : prev,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to activate influencers');
+    }
+  };
+
+  const handleDeactivateSelectedInfluencers = async () => {
+    if (!data) return;
+    const ids = Array.from(selectedInfluencerIds);
+    if (ids.length === 0) return;
+    try {
+      await Promise.all(ids.map(id => apiClient.updateInfluencerEnabled(id, false)));
+      setInfluencerStates(prev => {
+        const next: Record<string, { enabled: boolean }> = { ...prev };
+        ids.forEach(id => {
+          next[id] = {
+            ...(next[id] || { enabled: false }),
+            enabled: false,
+          };
+        });
+        return next;
+      });
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              influencers: prev.influencers.map(inf =>
+                ids.includes(inf.influencerId) ? { ...inf, enabled: false } : inf,
+              ),
+            }
+          : prev,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to deactivate influencers');
+    }
+  };
+
+  const handleDeleteSelectedInfluencers = async () => {
+    if (!data) return;
+    const ids = Array.from(selectedInfluencerIds);
+    if (ids.length === 0) return;
+    try {
+      await Promise.all(ids.map(id => apiClient.deleteInfluencer(id)));
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              influencers: prev.influencers.filter(inf => !ids.includes(inf.influencerId)),
+            }
+          : prev,
+      );
+      setInfluencerStates(prev => {
+        const next = { ...prev };
+        ids.forEach(id => {
+          delete next[id];
+        });
+        return next;
+      });
+      if (selectedInfluencer && ids.includes(selectedInfluencer.influencerId)) {
+        setSelectedInfluencer(null);
+        setGallery(null);
+      }
+      clearInfluencerSelection();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete influencers');
+    }
+  };
+
   const handleEnableAllInfluencers = async () => {
     try {
       if (!data) return;
       await Promise.all(data.influencers.map(inf => apiClient.updateInfluencerEnabled(inf.influencerId, true)));
-      const nextStates: Record<string, { enabled: boolean; isDefault: boolean }> = {};
+      const nextStates: Record<string, { enabled: boolean }> = {};
       data.influencers.forEach(inf => {
-        nextStates[inf.influencerId] = { enabled: true, isDefault: false };
+        nextStates[inf.influencerId] = { enabled: true };
       });
       setInfluencerStates(nextStates);
       setData({ ...data, influencers: data.influencers.map(inf => ({ ...inf, enabled: true })) });
@@ -286,9 +417,9 @@ export default function BrandDashboard() {
     try {
       if (!data) return;
       await Promise.all(data.influencers.map(inf => apiClient.updateInfluencerEnabled(inf.influencerId, false)));
-      const nextStates: Record<string, { enabled: boolean; isDefault: boolean }> = {};
+      const nextStates: Record<string, { enabled: boolean }> = {};
       data.influencers.forEach(inf => {
-        nextStates[inf.influencerId] = { enabled: false, isDefault: false };
+        nextStates[inf.influencerId] = { enabled: false };
       });
       setInfluencerStates(nextStates);
       setData({ ...data, influencers: data.influencers.map(inf => ({ ...inf, enabled: false })) });
@@ -358,54 +489,173 @@ export default function BrandDashboard() {
     }
   };
 
-  const handleToggleCardSelection = (cardId: string) => {
-    setSelectedCards(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(cardId)) {
-        newSet.delete(cardId);
-      } else {
-        newSet.add(cardId);
-      }
-      return newSet;
-    });
-  };
-
   const handlePublishSelected = async () => {
     if (selectedCards.size === 0) return;
     try {
-      await apiClient.publishCards(Array.from(selectedCards));
+      const ids = Array.from(selectedCards);
+      await apiClient.publishCards(ids);
       const newStatuses = { ...cardStatuses };
-      selectedCards.forEach(cardId => {
+      ids.forEach(cardId => {
         newStatuses[cardId] = 'published';
       });
       setCardStatuses(newStatuses);
-      setSelectedCards(new Set());
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              cards: prev.cards.map(card =>
+                ids.includes(card.cardId) ? { ...card, status: 'published' } : card,
+              ),
+            }
+          : prev,
+      );
+      clearCardSelection();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to publish cards');
     }
   };
 
-  const handleSelectAllCards = () => {
-    const ids = data?.cards.map(c => c.cardId) ?? [];
-    setSelectedCards(new Set(ids));
+  const handleMoveSelectedToDraft = async () => {
+    if (selectedCards.size === 0) return;
+    try {
+      const ids = Array.from(selectedCards);
+      await apiClient.unpublishCards(ids);
+
+      const newStatuses = { ...cardStatuses };
+      ids.forEach(cardId => {
+        newStatuses[cardId] = 'draft';
+      });
+      setCardStatuses(newStatuses);
+
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              cards: prev.cards.map(card =>
+                ids.includes(card.cardId) ? { ...card, status: 'draft' } : card,
+              ),
+            }
+          : prev,
+      );
+
+      clearCardSelection();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to move cards back to draft');
+    }
   };
 
-  const handleClearSelection = () => {
-    setSelectedCards(new Set());
+  const handleDeleteSingleCard = async (cardId: string) => {
+    try {
+      await apiClient.deleteCards([cardId]);
+
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              cards: prev.cards.filter((c) => c.cardId !== cardId),
+            }
+          : prev,
+      );
+
+      setCardStatuses(prev => {
+        const next = { ...prev };
+        delete next[cardId];
+        return next;
+      });
+
+      if (selectedCards.has(cardId)) {
+        toggleCardSelection(cardId);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete card');
+    }
   };
 
-  const handleGenerateDataset = () => {
-    // Placeholder behavior: simulate an AI job starting
+  const handleDeleteSelected = async () => {
+    if (selectedCards.size === 0) return;
+    try {
+      const ids = Array.from(selectedCards);
+      await apiClient.deleteCards(ids);
+
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              cards: prev.cards.filter((c) => !selectedCards.has(c.cardId)),
+            }
+          : prev,
+      );
+
+      setCardStatuses((prev) => {
+        const next = { ...prev };
+        ids.forEach((id) => {
+          delete next[id];
+        });
+        return next;
+      });
+
+      clearCardSelection();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete cards');
+    }
+  };
+
+  const handleGenerateDataset = async () => {
+    if (!data) return;
+
     setIsGeneratingDataset(true);
-    // Optional: auto-clear after a short delay to keep the UI responsive
-    setTimeout(() => {
+    setError(null);
+    setGenerationSummary(null);
+
+    try {
+      // If specific influencers are selected, ensure they are marked as enabled
+      // so the card generation workflow can find "enabled" influencers.
+      if (selectedInfluencerIds.size > 0) {
+        await handleActivateSelectedInfluencers();
+      }
+
+      // Trigger card generation workflow for this brand
+      const workflowResult = await apiClient.generateCards(data.brand.brandId);
+
+      // Refresh cards from API so the gallery shows newly generated cards
+      const refreshed = await apiClient.getCards(data.brand.brandId);
+
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              cards: refreshed.cards,
+            }
+          : prev,
+      );
+
+      const updatedStatuses: Record<string, 'draft' | 'ready' | 'published'> = {};
+      refreshed.cards.forEach(card => {
+        updatedStatuses[card.cardId] = (card.status as 'draft' | 'ready' | 'published') ?? 'draft';
+      });
+      setCardStatuses(updatedStatuses);
+
+      const totalCards = refreshed.cards.length;
+      const totalWithImages = refreshed.cards.filter(card => !!card.imageUrl).length;
+
+      setGenerationSummary({
+        totalGenerated: workflowResult.totalGenerated ?? 0,
+        totalSkipped: workflowResult.totalSkipped ?? 0,
+        totalCards,
+        totalWithImages,
+        message: workflowResult.message,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to generate cards');
+    } finally {
       setIsGeneratingDataset(false);
-    }, 3000);
+    }
   };
 
   const handlePublishDataset = () => {
     if (!data) return;
-    const url = `${window.location.origin}/dataset-placeholder.html`;
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const url = `${baseUrl}/dataset/${data.brand.brandId}`;
     setDatasetUrl(url);
   };
 
@@ -441,19 +691,19 @@ export default function BrandDashboard() {
       {/* Tab Navigation */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '2px solid #dee2e6' }}>
         <button
-          onClick={() => setActiveTab('product')}
+          onClick={() => navigate(`/brand/${brandId ?? data.brand.brandId}/product`)}
           style={tabStyle(activeTab === 'product')}
         >
           Product
         </button>
         <button
-          onClick={() => setActiveTab('influencers')}
+          onClick={() => navigate(`/brand/${brandId ?? data.brand.brandId}/influencers`)}
           style={tabStyle(activeTab === 'influencers')}
         >
           Influencers
         </button>
         <button
-          onClick={() => setActiveTab('cards')}
+          onClick={() => navigate(`/brand/${brandId ?? data.brand.brandId}/cards`)}
           style={tabStyle(activeTab === 'cards')}
         >
           Cards
@@ -475,17 +725,50 @@ export default function BrandDashboard() {
         )}
         {activeTab === 'influencers' && (
           <>
-            <InfluencersTab
-              influencers={data.influencers}
-              influencerStates={influencerStates}
-              onToggle={handleToggleInfluencer}
-              onMatch={handleMatchInfluencers}
+            <SelectionFilterToolbar
+              title="Influencer Profiles"
+              selectedCount={selectedInfluencerIds.size}
+              visibleCount={filteredInfluencers.length}
+              totalCount={data.influencers.length}
+              searchPlaceholder="Search influencers..."
               searchTerm={influencerSearch}
               onSearchChange={setInfluencerSearch}
-              onEnableAll={handleEnableAllInfluencers}
-              onDisableAll={handleDisableAllInfluencers}
-              onDelete={handleDeleteInfluencer}
-              onSelect={(inf) => handleSelectInfluencer(inf)}
+              onSelectAll={selectAllInfluencers}
+              onClearSelection={clearInfluencerSelection}
+              actions={[
+                {
+                  label: 'Find New',
+                  onClick: handleMatchInfluencers,
+                  disabled: false,
+                  variant: 'primary',
+                },
+                {
+                  label: 'Use Selected in Generation',
+                  onClick: handleActivateSelectedInfluencers,
+                  disabled: selectedInfluencerIds.size === 0,
+                  variant: 'success',
+                },
+                {
+                  label: 'Skip Selected',
+                  onClick: handleDeactivateSelectedInfluencers,
+                  disabled: selectedInfluencerIds.size === 0,
+                  variant: 'default',
+                },
+                {
+                  label: 'Delete Selected',
+                  onClick: handleDeleteSelectedInfluencers,
+                  disabled: selectedInfluencerIds.size === 0,
+                  variant: 'danger',
+                },
+              ]}
+            />
+            <InfluencersTab
+              influencers={filteredInfluencers}
+              influencerStates={influencerStates}
+              selectedIds={selectedInfluencerIds}
+              onToggleSelected={toggleInfluencerSelection}
+              onToggleEnabled={handleToggleInfluencer}
+              onSelectOne={(inf) => handleSelectInfluencer(inf)}
             />
             {selectedInfluencer && (
               <div style={{ marginTop: '1.5rem', background: 'white', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '1.25rem', border: '1px solid #e9ecef' }} aria-label="Influencer Details">
@@ -538,78 +821,130 @@ export default function BrandDashboard() {
         )}
         {activeTab === 'cards' && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0 }}>Wisdom Cards</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                {isGeneratingDataset && (
-                  <span style={{ color: '#6c757d', fontStyle: 'italic', fontSize: '0.95rem' }}>
-                    Thinking …
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={handleGenerateDataset}
-                  disabled={isGeneratingDataset}
+            <SelectionFilterToolbar
+              title="Wisdom Cards"
+              selectedCount={selectedCards.size}
+              visibleCount={filteredCards.length}
+              totalCount={data.cards.length}
+              searchPlaceholder="Search cards (text or regex)..."
+              searchTerm={cardSearch}
+              onSearchChange={setCardSearch}
+              onSelectAll={selectAllCards}
+              onClearSelection={clearCardSelection}
+              actions={[
+                {
+                  label: 'Publish Selected',
+                  onClick: handlePublishSelected,
+                  disabled: selectedCards.size === 0,
+                  variant: 'success',
+                },
+                {
+                  label: 'Move to Draft',
+                  onClick: handleMoveSelectedToDraft,
+                  disabled: selectedCards.size === 0,
+                  variant: 'default',
+                },
+                {
+                  label: 'Delete Selected',
+                  onClick: handleDeleteSelected,
+                  disabled: selectedCards.size === 0,
+                  variant: 'danger',
+                },
+              ]}
+            />
+            {generationSummary && (
+              <div
+                style={{
+                  marginBottom: '0.75rem',
+                  fontSize: '0.85rem',
+                  color: '#6c757d',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.15rem',
+                }}
+              >
+                <span>
+                  {generationSummary.message ??
+                    `Generated ${generationSummary.totalGenerated} cards (${generationSummary.totalSkipped} skipped).`}
+                </span>
+                <span>
+                  Current brand has {generationSummary.totalCards} cards,{' '}
+                  {generationSummary.totalWithImages} with images and{' '}
+                  {generationSummary.totalCards - generationSummary.totalWithImages} without images.
+                </span>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1rem' }}>
+              {isGeneratingDataset && (
+                <span style={{ color: '#6c757d', fontStyle: 'italic', fontSize: '0.95rem' }}>
+                  Thinking …
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleGenerateDataset}
+                disabled={isGeneratingDataset}
+                style={{
+                  padding: '0.6rem 1.25rem',
+                  background: isGeneratingDataset ? '#6c757d' : '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: isGeneratingDataset ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '0.95rem',
+                }}
+                title="Placeholder: trigger AI dataset generation for these cards"
+              >
+                {isGeneratingDataset ? 'Generating…' : 'Generate Dataset'}
+              </button>
+
+              {datasetUrl ? (
+                <a
+                  href={datasetUrl}
+                  target="_blank"
+                  rel="noreferrer"
                   style={{
                     padding: '0.6rem 1.25rem',
-                    background: isGeneratingDataset ? '#6c757d' : '#007bff',
+                    background: '#28a745',
                     color: 'white',
-                    border: 'none',
                     borderRadius: '4px',
-                    cursor: isGeneratingDataset ? 'not-allowed' : 'pointer',
+                    textDecoration: 'none',
                     fontWeight: 'bold',
                     fontSize: '0.95rem',
                   }}
-                  title="Placeholder: trigger AI dataset generation for these cards"
+                  title="Open published dataset page in a new tab"
                 >
-                  {isGeneratingDataset ? 'Generating…' : 'Generate Dataset'}
+                  Open Dataset Page
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handlePublishDataset}
+                  style={{
+                    padding: '0.6rem 1.25rem',
+                    background: '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '0.95rem',
+                  }}
+                  title="Publish this brand's cards as a crawlable dataset page"
+                >
+                  Publish
                 </button>
-
-                {datasetUrl ? (
-                  <a
-                    href={datasetUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      padding: '0.6rem 1.25rem',
-                      background: '#28a745',
-                      color: 'white',
-                      borderRadius: '4px',
-                      textDecoration: 'none',
-                      fontWeight: 'bold',
-                      fontSize: '0.95rem',
-                    }}
-                    title="Open published dataset page in a new tab"
-                  >
-                    Open Dataset Page
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handlePublishDataset}
-                    style={{
-                      padding: '0.6rem 1.25rem',
-                      background: '#6c757d',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '0.95rem',
-                    }}
-                    title="Publish this brand's cards as a crawlable dataset page"
-                  >
-                    Publish
-                  </button>
-                )}
-              </div>
+              )}
             </div>
 
             <CardGallery
-              cards={data.cards}
+              cards={filteredCards}
               influencers={data.influencers}
               personas={data.personas}
               onImageClick={(url) => setLightboxUrl(url)}
+              selectedIds={selectedCards}
+              onToggleSelected={toggleCardSelection}
             />
           </>
         )}
@@ -660,6 +995,7 @@ function BrandTab({ brand, personas, environments, cards, onImageClick, onUpload
   const imagesToShow = productImages.length > 0 ? productImages : fallbackImages;
 
   const isFlowForm = brand.urlSlug === 'flowform';
+  const [reviewTab, setReviewTab] = useState<'personas' | 'environments'>('personas');
 
   const displayPersonas: Persona[] = isFlowForm
     ? [
@@ -668,32 +1004,32 @@ function BrandTab({ brand, personas, environments, cards, onImageClick, onUpload
           brandId: brand.brandId,
           label: 'WFH Yoga Creative',
           description:
-            'Remote designer or content creator in a small city apartment, using yoga and short flows to stay sane after long laptop days.',
-          tags: ['remote-work', 'yoga-first', 'small-apartment', 'creative'],
+            'Remote creative professional who practices yoga daily in their small apartment to counteract desk work. Values mindful movement and form awareness.',
+          tags: ['yoga', 'WFH', 'creative', 'desk-body'],
         },
         {
-          personaId: 'demo_midcareer_desk_worker',
+          personaId: 'demo_midcareer_knowledge_worker',
           brandId: brand.brandId,
-          label: 'Mid-Career Desk Worker with Stiff Back',
+          label: 'Mid-Career Knowledge Worker',
           description:
-            '35–50 year old knowledge worker who sits in meetings all day and wants to fix a stiff back and tight hips with safer yoga and light strength.',
-          tags: ['desk-bound', 'back-pain', 'light-strength', 'posture'],
+            '40-something desk worker experiencing back stiffness and poor posture. Looking for gentle, sustainable movement practices.',
+          tags: ['desk-body', 'posture', 'back-pain', 'beginner'],
         },
         {
           personaId: 'demo_beginner_runner_yoga',
           brandId: brand.brandId,
           label: 'Beginner Runner Who Loves Yoga',
           description:
-            'Office worker training for a first 10K who already does yoga and wants running form to feel as aligned and mindful as mat practice.',
-          tags: ['beginner-runner', 'yoga-cross-training', 'injury-prevention'],
+            'Weekend runner who cross-trains with yoga. Wants to improve running form and prevent injuries through better movement awareness.',
+          tags: ['running', 'yoga', 'form-feedback', 'injury-prevention'],
         },
         {
-          personaId: 'demo_young_parent_caregiver',
+          personaId: 'demo_young_parent_balancing_life',
           brandId: brand.brandId,
-          label: 'Young Parent or Caregiver Squeezing In Workouts',
+          label: 'Young Parent Balancing Life',
           description:
-            'Juggling kids, caregiving, and work; can only manage short sessions at home and wants each 10–20 minutes of yoga or strength to be safe and effective.',
-          tags: ['time-poor', 'home-workouts', 'efficiency', 'caregiver'],
+            'Early-30s parent working from home, squeezing in quick workouts between responsibilities. Needs efficient, space-friendly fitness solutions.',
+          tags: ['WFH', 'parent', 'time-constrained', 'yoga', 'strength'],
         },
       ]
     : personas;
@@ -782,7 +1118,8 @@ function BrandTab({ brand, personas, environments, cards, onImageClick, onUpload
         ))}
       </div>
 
-      <h3 style={{ margin: '1rem 0 0.75rem 0' }}>Personas</h3>
+      {/* Show both Personas and Environments together so product view gives full context */}
+      <h3 style={{ margin: '0 0 0.75rem 0' }}>Personas</h3>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         {displayPersonas.map((persona) => (
           <div key={persona.personaId} style={{ padding: '1rem', background: 'white', borderRadius: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
@@ -797,10 +1134,14 @@ function BrandTab({ brand, personas, environments, cards, onImageClick, onUpload
         ))}
       </div>
 
-      <h3 style={{ margin: '1rem 0 0.75rem 0' }}>Environments</h3>
+      <h3 style={{ margin: '0 0 0.75rem 0' }}>Environments</h3>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
         {displayEnvironments.map(env => (
-          <div key={env.environmentId} style={{ padding: '1rem', background: 'white', borderRadius: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+          <div
+            key={env.environmentId}
+            data-testid="environment-card"
+            style={{ padding: '1rem', background: 'white', borderRadius: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
+          >
             <h4 style={{ margin: '0 0 0.35rem 0', color: '#28a745' }}>{env.label}</h4>
             <p style={{ margin: 0, color: '#495057', fontSize: '0.95rem' }}>{env.description}</p>
           </div>
@@ -813,111 +1154,29 @@ function BrandTab({ brand, personas, environments, cards, onImageClick, onUpload
 function InfluencersTab({
   influencers,
   influencerStates,
-  onToggle,
-  onMatch,
-  searchTerm,
-  onSearchChange,
-  onEnableAll,
-  onDisableAll,
-  onDelete,
-  onSelect,
+  selectedIds,
+  onToggleSelected,
+  onToggleEnabled,
+  onSelectOne,
 }: {
   influencers: Influencer[];
-  influencerStates: Record<string, { enabled: boolean; isDefault: boolean }>;
-  onToggle: (id: string, enabled: boolean) => void;
-  onMatch: () => void;
-  searchTerm: string;
-  onSearchChange: (v: string) => void;
-  onEnableAll: () => void;
-  onDisableAll: () => void;
-  onDelete: (id: string) => void;
-  onSelect: (inf: Influencer) => void;
+  influencerStates: Record<string, { enabled: boolean }>;
+  selectedIds: Set<string>;
+  onToggleSelected: (id: string) => void;
+  onToggleEnabled: (id: string, enabled: boolean) => void;
+  onSelectOne: (inf: Influencer) => void;
 }) {
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-        <h2 style={{ margin: 0 }}>Influencer Profiles</h2>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            data-testid="match-influencers"
-            onClick={onMatch}
-            title="Find new influencers aligned to the brand content; adds one per click and enables the core set"
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontWeight: 'bold'
-            }}
-          >
-            Find New
-          </button>
-          <button
-            data-testid="enable-all-influencers"
-            onClick={onEnableAll}
-            title="Enable all influencers"
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#e9ecef',
-              border: '1px solid #ced4da',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Select All
-          </button>
-          <button
-            data-testid="disable-all-influencers"
-            onClick={onDisableAll}
-            title="Disable all influencers"
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#e9ecef',
-              border: '1px solid #ced4da',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Unselect All
-          </button>
-        </div>
-      </div>
-      <div style={{ marginBottom: '1rem' }}>
-        <input
-          type="text"
-          placeholder="Search influencers..."
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '0.6rem 0.75rem',
-            border: '1px solid #ced4da',
-            borderRadius: '6px',
-            fontSize: '1rem'
-          }}
-        />
-      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-        {influencers
-          .filter((inf) => inf.enabled)
-          .filter((inf) => {
-            if (!searchTerm.trim()) return true;
-            const needle = searchTerm.toLowerCase();
-            return (
-              inf.name.toLowerCase().includes(needle) ||
-              inf.domain.toLowerCase().includes(needle) ||
-              inf.bio.toLowerCase().includes(needle)
-            );
-          })
-          .map((influencer) => {
-          const state = influencerStates[influencer.influencerId] || { enabled: false, isDefault: false };
+        {influencers.map((influencer) => {
+          const state = influencerStates[influencer.influencerId] || { enabled: false };
+          const isSelected = selectedIds.has(influencer.influencerId);
           return (
             <div
               key={influencer.influencerId}
               data-testid="influencer-card"
-              onClick={() => onSelect(influencer)}
+              onClick={() => onSelectOne(influencer)}
               style={{
                 padding: '1.5rem',
                 background: 'white',
@@ -927,28 +1186,36 @@ function InfluencersTab({
                 cursor: 'pointer'
               }}
             >
-              {influencer.imageUrl && (
-                <img
-                  src={influencer.imageUrl}
-                  alt={influencer.name}
-                  style={{
-                    width: '100%',
-                    height: '180px',
-                    objectFit: 'cover',
-                    borderRadius: '6px',
-                    marginBottom: '0.75rem',
-                    border: '1px solid #e9ecef',
-                    cursor: 'zoom-in'
-                  }}
-                  onError={(e) => {
-                    e.currentTarget.src = `https://placehold.co/400x200?text=${encodeURIComponent(influencer.name)}`;
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setLightboxUrl(influencer.imageUrl);
-                  }}
-                />
-              )}
+              <img
+                src={influencer.imageUrl || `https://placehold.co/400x200?text=${encodeURIComponent(influencer.name)}`}
+                alt={influencer.name}
+                style={{
+                  width: '100%',
+                  height: '180px',
+                  objectFit: 'cover',
+                  borderRadius: '6px',
+                  marginBottom: '0.75rem',
+                  border: '1px solid #e9ecef',
+                  cursor: 'zoom-in'
+                }}
+                onError={(e) => {
+                  e.currentTarget.src = `https://placehold.co/400x200?text=${encodeURIComponent(influencer.name)}`;
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      onToggleSelected(influencer.influencerId);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '0.85rem', color: '#495057' }}>Select</span>
+                </label>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <h3 style={{ margin: 0, color: '#6f42c1' }}>{influencer.name}</h3>
               </div>
@@ -961,31 +1228,25 @@ function InfluencersTab({
 
               {/* Controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  data-testid="enable-toggle"
-                  checked={state.enabled}
-                  onChange={() => onToggle(influencer.influencerId, !state.enabled)}
-                  style={{ cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: '0.9rem', color: '#495057' }}>Enabled</span>
-              </label>
               <button
-                data-testid="delete-influencer"
-                onClick={() => onDelete(influencer.influencerId)}
+                type="button"
+                data-testid="enable-toggle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleEnabled(influencer.influencerId, !state.enabled);
+                }}
                 style={{
                   padding: '0.5rem 1rem',
-                  background: '#e74c3c',
-                  color: 'white',
-                  border: 'none',
+                  background: state.enabled ? '#28a745' : '#e9ecef',
+                  color: state.enabled ? 'white' : '#495057',
+                  border: '1px solid #ced4da',
                   borderRadius: '4px',
                   cursor: 'pointer',
                   fontSize: '0.85rem',
-                  fontWeight: 'bold'
+                  fontWeight: 'bold',
                 }}
               >
-                Delete
+                {state.enabled ? 'In generation' : 'Use in generation'}
               </button>
             </div>
             </div>
@@ -996,12 +1257,13 @@ function InfluencersTab({
   );
 }
 
-function PublishTab({
+export function PublishTab({
   cards,
   cardStatuses,
   selectedCards,
   onToggleSelection,
   onPublish,
+  onDeleteSelected,
   onSelectAll,
   onClearSelection,
   searchTerm,
@@ -1012,6 +1274,7 @@ function PublishTab({
   selectedCards: Set<string>;
   onToggleSelection: (id: string) => void;
   onPublish: () => void;
+  onDeleteSelected: () => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
   searchTerm: string;
@@ -1021,84 +1284,35 @@ function PublishTab({
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h2 style={{ margin: 0 }}>Publish Cards</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button
-            data-testid="select-all"
-            onClick={onSelectAll}
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#e9ecef',
-              border: '1px solid #ced4da',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Select All
-          </button>
-          <button
-            data-testid="clear-selection"
-            onClick={onClearSelection}
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#e9ecef',
-              border: '1px solid #ced4da',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Unselect All
-          </button>
-          <span style={{ color: '#6c757d' }}>{publishedCount} published</span>
-          <button
-            data-testid="publish-button"
-            onClick={onPublish}
-            disabled={selectedCards.size === 0}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: selectedCards.size > 0 ? '#28a745' : '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: selectedCards.size > 0 ? 'pointer' : 'not-allowed',
-              fontSize: '1rem',
-              fontWeight: 'bold'
-            }}
-          >
-            Publish Selected ({selectedCards.size})
-          </button>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '1rem' }}>
-        <input
-          type="text"
-          placeholder="Search cards..."
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '0.6rem 0.75rem',
-            border: '1px solid #ced4da',
-            borderRadius: '6px',
-            fontSize: '1rem'
-          }}
-        />
-      </div>
+      <SelectionFilterToolbar
+        title="Publish Cards"
+        subtitle={<span style={{ color: '#6c757d' }}>{publishedCount} published</span>}
+        selectedCount={selectedCards.size}
+        visibleCount={cards.length}
+        totalCount={cards.length}
+        searchPlaceholder="Search cards..."
+        searchTerm={searchTerm}
+        onSearchChange={onSearchChange}
+        onSelectAll={onSelectAll}
+        onClearSelection={onClearSelection}
+        actions={[
+          {
+            label: `Publish Selected (${selectedCards.size})`,
+            onClick: onPublish,
+            disabled: selectedCards.size === 0,
+            variant: 'success',
+          },
+          {
+            label: 'Delete Selected',
+            onClick: onDeleteSelected,
+            disabled: selectedCards.size === 0,
+            variant: 'danger',
+          },
+        ]}
+      />
 
       <div style={{ background: 'white', borderRadius: '8px', overflow: 'hidden' }}>
-        {cards
-          .filter(card => {
-            if (!searchTerm.trim()) return true;
-            const needle = searchTerm.toLowerCase();
-            return (
-              card.query.toLowerCase().includes(needle) ||
-              card.response.toLowerCase().includes(needle) ||
-              card.cardId.toLowerCase().includes(needle)
-            );
-          })
-          .map(card => {
+        {cards.map(card => {
           const status = cardStatuses[card.cardId] || 'draft';
           const isSelected = selectedCards.has(card.cardId);
 

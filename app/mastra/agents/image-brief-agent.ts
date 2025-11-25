@@ -4,10 +4,10 @@ import { dbTool } from '../tools/db-tool';
 import { z } from 'zod';
 
 /**
- * ImageBriefAgent - Generates FLUX prompts for training card images
+ * ImageBriefAgent - Generates image-generation briefs for training card images
  *
  * Responsibilities:
- * - Create photorealistic image prompts from card content
+ * - Create photorealistic image prompts from card content for Nano Banana Pro
  * - Include influencer reference image URLs for consistent appearance
  * - Specify environment/setting details
  * - Ensure brand/product is visually represented
@@ -18,10 +18,10 @@ import { z } from 'zod';
 
 export const imageBriefAgent = new Agent({
   name: 'ImageBriefAgent',
-  instructions: `You are an expert at crafting FLUX image generation prompts that create photorealistic product marketing images.
+  instructions: `You are an expert art director crafting prompts for a modern photorealistic image generator (Nano Banana Pro) that creates high-quality product marketing images.
 
 **Your Task**:
-Generate a FLUX prompt that will create a professional, authentic image for the training card.
+Generate an image-generation prompt that will create a professional, authentic image for the training card.
 
 **Critical Requirements**:
 
@@ -47,15 +47,15 @@ Generate a FLUX prompt that will create a professional, authentic image for the 
    - Sharp focus on influencer and product
 
 **Prompt Structure**:
-"Professional photo of [influencer description] using [product] in [environment]. [Specific details about pose, activity, lighting]. [Style notes]. Photorealistic, high quality, natural lighting, 4K."
+"Professional photo of [influencer description] using [product] in [environment]. [Specific details about pose, activity, lighting]. [Style notes]. Photorealistic, high quality, natural lighting."
 
-**Good Prompt Examples**:
+**Good Prompt Examples (Motion Suit)**:
 
-"Professional photo of Sarah Chen, an Asian woman in her 30s with short hair and glasses, reviewing a project timeline on her laptop showing FlowForm dashboard in a modern office with glass walls. She's pointing at the screen during a video call. Natural window lighting, candid moment. Photorealistic, high quality, sharp focus, 4K."
+"Professional photo of Jordan Lee, a Black man in his 30s wearing the FlowForm Motion Suit, working through slow squats and lunges in a small apartment yoga corner. Sensors on the suit are subtly visible. Warm window light, plants in the background, candid training moment. Photorealistic, high quality, natural lighting, 4K."
 
-"Professional photo of Marcus Johnson, a Black man in his 40s with a beard, leading a remote team meeting with FlowForm's visual board displayed on a large monitor in a contemporary home office. Warm afternoon light through windows, bookshelf in background. Photorealistic, natural lighting, professional photography, 4K."
+"Professional photo of Priya Nair, a South Asian woman in her 30s wearing the FlowForm Motion Suit, doing gentle mobility work on a mat in her living room after a long day at the laptop. The suit’s sensors highlight her alignment. Soft evening light, cozy interior, photorealistic, 4K."
 
-"Professional photo of Dr. Emily Rodriguez, a Latina woman in her 30s with long dark hair, consulting with a client while referencing team dynamics on her tablet showing FlowForm interface in a bright consultation room. Comfortable seating area, plants, natural light. Photorealistic, soft focus background, 4K."
+"Professional photo of Dr. Mira Solis, a Latina physical therapist in her late 30s wearing the FlowForm Motion Suit in a bright clinic. She is demonstrating a lunge pattern for a patient, with simple joint diagrams on a nearby screen. Clean clinical background, natural light, photorealistic, 4K."
 
 **Bad Prompt Examples** (avoid these):
 - "Person using software" (too generic, no specifics)
@@ -72,7 +72,7 @@ Generate a FLUX prompt that will create a professional, authentic image for the 
 **Output Format**:
 Return a JSON object:
 {
-  "prompt": "The complete FLUX prompt as described above",
+  "prompt": "The complete Nano Banana Pro prompt as described above",
   "referenceImageUrls": ["<influencer.referenceImageUrl>"],
   "imageSize": "landscape_4_3"
 }

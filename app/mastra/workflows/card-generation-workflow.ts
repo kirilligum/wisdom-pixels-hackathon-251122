@@ -1,5 +1,11 @@
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
+import { dbTool } from '../tools/db-tool';
+import { cardQueryAgent } from '../agents/card-query-agent';
+import { cardAnswerAgent } from '../agents/card-answer-agent';
+import { safetyAgent } from '../agents/safety-agent';
+import { imageBriefAgent } from '../agents/image-brief-agent';
+import { imageGenerationTool } from '../tools/image-generation-tool';
 
 /**
  * CardGenerationWorkflow - Generates training cards for a brand
@@ -36,6 +42,7 @@ const loadBrandContextStep = createStep({
       id: z.string(),
       name: z.string(),
       domain: z.string(),
+      productImageUrl: z.string().optional(),
     }),
     personas: z.array(z.object({
       id: z.string(),
@@ -55,85 +62,88 @@ const loadBrandContextStep = createStep({
       referenceImageUrl: z.string(),
     })),
   }),
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData }) => {
     const { brandId } = inputData;
-
-    const dbTool = mastra.getTool('db');
 
     // Get brand
     const brandResult = await dbTool.execute({
-      context: {
-        operation: 'getBrandById',
-        params: { id: brandId },
-      },
-      runtimeContext: {},
+      operation: 'getBrand',
+      params: { brandId },
     });
 
-    if (!brandResult.success || !brandResult.brand) {
+    if (!brandResult.success || !brandResult.data) {
       throw new Error(`Brand not found: ${brandId}`);
     }
+    const brand = brandResult.data;
 
     // Get personas
     const personasResult = await dbTool.execute({
-      context: {
-        operation: 'getPersonasByBrandId',
-        params: { brandId },
-      },
-      runtimeContext: {},
+      operation: 'getPersonasByBrand',
+      params: { brandId },
     });
 
-    if (!personasResult.success || personasResult.personas.length === 0) {
+    if (!personasResult.success || !Array.isArray(personasResult.data) || personasResult.data.length === 0) {
       throw new Error(`No personas found for brand: ${brandId}`);
     }
+    const personas = personasResult.data;
 
     // Get environments
     const environmentsResult = await dbTool.execute({
-      context: {
-        operation: 'getEnvironmentsByBrandId',
-        params: { brandId },
-      },
-      runtimeContext: {},
+      operation: 'getEnvironmentsByBrand',
+      params: { brandId },
     });
 
-    if (!environmentsResult.success || environmentsResult.environments.length === 0) {
+    if (!environmentsResult.success || !Array.isArray(environmentsResult.data) || environmentsResult.data.length === 0) {
       throw new Error(`No environments found for brand: ${brandId}`);
     }
+    const environments = environmentsResult.data;
 
-    // Get enabled influencers
-    const influencersResult = await dbTool.execute({
-      context: {
-        operation: 'getEnabledInfluencers',
-        params: {},
-      },
-      runtimeContext: {},
+    // Get enabled influencers; if none are enabled, gracefully fall back
+    // to all influencers so card generation can still proceed.
+    let influencersResult = await dbTool.execute({
+      operation: 'getEnabledInfluencers',
+      params: {},
     });
 
-    if (!influencersResult.success || influencersResult.influencers.length === 0) {
-      throw new Error('No enabled influencers found');
+    if (!influencersResult.success || !Array.isArray(influencersResult.data) || influencersResult.data.length === 0) {
+      const allInfluencersResult = await dbTool.execute({
+        operation: 'getInfluencers',
+        params: {},
+      });
+
+      if (!allInfluencersResult.success || !Array.isArray(allInfluencersResult.data) || allInfluencersResult.data.length === 0) {
+        throw new Error('No influencers found');
+      }
+
+      influencersResult = allInfluencersResult;
     }
+    const influencers = influencersResult.data;
 
     return {
       brand: {
-        id: brandResult.brand.id,
-        name: brandResult.brand.name,
-        domain: brandResult.brand.domain,
+        id: brand.brandId,
+        name: brand.name,
+        domain: brand.domain,
+        productImageUrl: Array.isArray(brand.productImages) && brand.productImages.length > 0
+          ? brand.productImages[0]
+          : undefined,
       },
-      personas: personasResult.personas.map((p: any) => ({
-        id: p.id,
+      personas: personas.map((p: any) => ({
+        id: p.personaId,
         label: p.label,
         description: p.description,
       })),
-      environments: environmentsResult.environments.map((e: any) => ({
-        id: e.id,
+      environments: environments.map((e: any) => ({
+        id: e.environmentId,
         label: e.label,
         description: e.description,
       })),
-      influencers: influencersResult.influencers.map((i: any) => ({
-        id: i.id,
+      influencers: influencers.map((i: any) => ({
+        id: i.influencerId,
         name: i.name,
         bio: i.bio,
-        domainExpertise: i.domainExpertise,
-        referenceImageUrl: i.referenceImageUrl,
+        domainExpertise: i.domain,
+        referenceImageUrl: i.imageUrl,
       })),
     };
   },
@@ -148,6 +158,7 @@ const generateCombinationsStep = createStep({
       id: z.string(),
       name: z.string(),
       domain: z.string(),
+      productImageUrl: z.string().optional(),
     }),
     personas: z.array(z.object({
       id: z.string(),
@@ -173,6 +184,7 @@ const generateCombinationsStep = createStep({
         id: z.string(),
         name: z.string(),
         domain: z.string(),
+        productImageUrl: z.string().optional(),
       }),
       persona: z.object({
         id: z.string(),
@@ -225,6 +237,7 @@ const processCombinationStep = createStep({
       id: z.string(),
       name: z.string(),
       domain: z.string(),
+      productImageUrl: z.string().optional(),
     }),
     persona: z.object({
       id: z.string(),
@@ -249,11 +262,10 @@ const processCombinationStep = createStep({
     skipped: z.boolean(),
     reason: z.string().optional(),
   }),
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData }) => {
     const { brand, persona, environment, influencer } = inputData;
 
     // 3a. Generate query
-    const cardQueryAgent = mastra.getAgent('cardQueryAgent');
     const queryPrompt = `Generate a question about ${brand.name} (${brand.domain}) that ${persona.label} might ask, mentioning influencer ${influencer.name} by name.
 
 Persona: ${persona.description}
@@ -268,7 +280,6 @@ Generate only the question, under 200 characters.`;
     const query = queryResponse.text.trim();
 
     // 3b. Generate response
-    const cardAnswerAgent = mastra.getAgent('cardAnswerAgent');
     const answerPrompt = `As ${influencer.name}, answer this question about ${brand.name}: "${query}"
 
 Your profile:
@@ -288,7 +299,6 @@ Keep under 300 characters.`;
     const response = answerResponse.text.trim();
 
     // 3c. Safety check
-    const safetyAgent = mastra.getAgent('safetyAgent');
     const safetyPrompt = `Review this training card content for safety issues:
 
 Query: ${query}
@@ -324,8 +334,7 @@ Respond with valid JSON:
     }
 
     // 3d. Generate image brief
-    const imageBriefAgent = mastra.getAgent('imageBriefAgent');
-    const imageBriefPrompt = `Generate a FLUX prompt for a professional training card image:
+    const imageBriefPrompt = `Generate an image-generation prompt for a professional training card image suitable for Nano Banana Pro:
 
 Brand: ${brand.name}
 Influencer: ${influencer.name} (${influencer.bio})
@@ -336,15 +345,19 @@ Card Response: ${response}
 Create a photorealistic prompt showing ${influencer.name} using ${brand.name} in ${environment.label}.
 
 Respond with valid JSON:
-{
-  "prompt": "The complete FLUX prompt",
-  "referenceImageUrls": ["${influencer.referenceImageUrl}"],
-  "imageSize": "landscape_4_3"
-}`;
+  {
+    "prompt": "The complete image-generation prompt",
+    "referenceImageUrls": ["${influencer.referenceImageUrl}"],
+    "imageSize": "landscape_4_3"
+  }`;
 
     const imageBriefResponse = await imageBriefAgent.generate(imageBriefPrompt);
 
-    let imageBrief;
+    let imageBrief: {
+      prompt: string;
+      referenceImageUrls?: string[];
+      imageSize?: string;
+    };
     try {
       const jsonMatch = imageBriefResponse.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -362,53 +375,55 @@ Respond with valid JSON:
     }
 
     // 3e. Generate image
-    const imageGenerationTool = mastra.getTool('image-generation');
     let imageUrl = '';
+
+    // Build reference images: always include influencer, optionally brand product image
+    const referenceImageUrls: string[] = Array.isArray(imageBrief.referenceImageUrls)
+      ? [...imageBrief.referenceImageUrls]
+      : [influencer.referenceImageUrl];
+
+    if (brand.productImageUrl) {
+      referenceImageUrls.push(brand.productImageUrl);
+    }
 
     try {
       const imageResult = await imageGenerationTool.execute({
-        context: {
-          prompt: imageBrief.prompt,
-          referenceImageUrls: imageBrief.referenceImageUrls,
-          imageSize: imageBrief.imageSize || 'landscape_4_3',
-        },
-        runtimeContext: {},
+        prompt: imageBrief.prompt,
+        referenceImageUrls,
+        imageSize: imageBrief.imageSize || 'landscape_4_3',
       });
 
-      if (imageResult.success) {
+      if (imageResult.success && imageResult.imageUrl) {
         imageUrl = imageResult.imageUrl;
       }
     } catch (error) {
       // If image generation fails, continue without image
-      console.error(`Image generation failed: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Image generation failed: ${message}`);
     }
 
     // 3f. Save card
-    const dbTool = mastra.getTool('db');
     const cardResult = await dbTool.execute({
-      context: {
-        operation: 'createCard',
-        params: {
-          brandId: brand.id,
-          personaId: persona.id,
-          environmentId: environment.id,
-          influencerId: influencer.id,
-          query,
-          response,
-          imageUrl: imageUrl || null,
-          imageBrief: imageBrief.prompt,
-          status: 'draft',
-        },
+      operation: 'createCard',
+      params: {
+        brandId: brand.id,
+        personaId: persona.id,
+        environmentId: environment.id,
+        influencerId: influencer.id,
+        query,
+        response,
+        imageUrl: imageUrl || '',
+        imageBrief: imageBrief.prompt,
+        status: 'draft',
       },
-      runtimeContext: {},
     });
 
-    if (!cardResult.success) {
+    if (!cardResult.success || !cardResult.data) {
       throw new Error(`Failed to save card: ${cardResult.error}`);
     }
 
     return {
-      cardId: cardResult.card.id,
+      cardId: cardResult.data.cardId,
       skipped: false,
     };
   },

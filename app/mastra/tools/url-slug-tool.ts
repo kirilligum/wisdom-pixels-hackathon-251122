@@ -21,7 +21,13 @@ export const urlSlugTool = createTool({
     isUnique: z.boolean().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
+  execute: async (input: any) => {
+    // Support both direct input (matching inputSchema) and
+    // Mastra tool context shape ({ context: ... })
+    const context = input && typeof input === 'object' && 'context' in input
+      ? (input as any).context
+      : input;
+
     const { text, maxLength = 50 } = context;
 
     try {

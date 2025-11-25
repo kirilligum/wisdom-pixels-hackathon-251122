@@ -1,5 +1,6 @@
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
+import { dbTool } from '../tools/db-tool';
 
 /**
  * PublishingWorkflow - Publishes draft training cards
@@ -26,29 +27,25 @@ const validateCardsStep = createStep({
     validCardIds: z.array(z.string()),
     invalidCardIds: z.array(z.string()),
   }),
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData }) => {
     const { cardIds } = inputData;
 
-    const dbTool = mastra.getTool('db');
     const validCardIds: string[] = [];
     const invalidCardIds: string[] = [];
 
     for (const cardId of cardIds) {
       const result = await dbTool.execute({
-        context: {
-          operation: 'getCardById',
-          params: { id: cardId },
-        },
-        runtimeContext: {},
+        operation: 'getCard',
+        params: { cardId },
       });
 
-      if (!result.success || !result.card) {
+      if (!result.success || !result.data) {
         invalidCardIds.push(cardId);
         continue;
       }
 
       // Only allow publishing cards that are in draft status
-      if (result.card.status === 'draft') {
+      if (result.data.status === 'draft') {
         validCardIds.push(cardId);
       } else {
         invalidCardIds.push(cardId);
@@ -72,15 +69,10 @@ const publishCardStep = createStep({
     success: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ inputData: cardId, mastra }) => {
-    const dbTool = mastra.getTool('db');
-
+  execute: async ({ inputData: cardId }) => {
     const result = await dbTool.execute({
-      context: {
-        operation: 'publishCard',
-        params: { id: cardId },
-      },
-      runtimeContext: {},
+      operation: 'publishCard',
+      params: { cardId },
     });
 
     if (!result.success) {

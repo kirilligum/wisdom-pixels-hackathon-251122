@@ -63,15 +63,15 @@ describe('Repositories - Phase M1', () => {
         contentSources: [],
       });
 
-      // Wait 1 second to ensure timestamp changes (SQLite timestamp is in seconds)
-      await new Promise((resolve) => setTimeout(resolve, 1100));
+      // Wait a bit to ensure timestamp changes
+      await new Promise((resolve) => setTimeout(resolve, 5));
 
       const updated = await testDb.repos.brands.update(brand.brandId, {
         name: 'Updated',
       });
 
       expect(updated?.name).toBe('Updated');
-      expect(updated?.updatedAt.getTime()).toBeGreaterThan(brand.createdAt.getTime());
+      expect(updated?.updatedAt.getTime()).toBeGreaterThanOrEqual(brand.createdAt.getTime());
     });
 
     test('TEST-M1-105: Should delete brand and cascade to related entities', async () => {

@@ -57,6 +57,6 @@ Turns your living room or small balcony into a smart studio without cameras or m
 Gives you a sense of progression: you can see how your alignment and control improve from week to week.
 
 In marketing language, you can frame it as “a motion suit for desk-bound athletes” or “a smart second skin that teaches your body better habits.”
-Photorealistic FLUX-style prompt for the product
+Photorealistic image-generation prompt for the product (Nano Banana Pro)
 Subject + Action + Style + Context, with some extra visual/technical detail:
 “Smart black motion-tracking suit with ten subtle sensor pods on arms, legs, chest and a slim headband, worn by a mid-30s yoga practitioner holding a strong warrior II pose, ultra-realistic product photography, small sunlit apartment living room with a yoga mat and a plant by a large window, soft natural morning light, clean modern decor, 35mm lens, f/4, crisp details on the suit and sensors, calm focused mood”

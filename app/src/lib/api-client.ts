@@ -115,6 +115,12 @@ export const apiClient = {
   publishCards: (cardIds: string[]) =>
     request<{ publishedCardIds: string[] }>(`/api/cards/publish`, 'POST', { cardIds }),
 
+  deleteCards: (cardIds: string[]) =>
+    request<{ deleted: number }>(`/api/cards/delete`, 'POST', { cardIds }),
+
+  unpublishCards: (cardIds: string[]) =>
+    request<{ updated: number }>(`/api/cards/unpublish`, 'POST', { cardIds }),
+
   generateContent: (prompt: string) =>
     request<{ text: string }>(`/api/content/generate`, 'POST', { prompt }),
 

@@ -79,6 +79,14 @@ const publishCardsSchema = z.object({
   cardIds: z.array(z.string().uuid()),
 });
 
+const deleteCardsSchema = z.object({
+  cardIds: z.array(z.string().uuid()),
+});
+
+const unpublishCardsSchema = z.object({
+  cardIds: z.array(z.string().uuid()),
+});
+
 const updateInfluencerEnabledSchema = z.object({
   enabled: z.boolean(),
 });
@@ -99,11 +107,11 @@ app.post('/api/brands', async (c) => {
   const run = await workflow.createRunAsync();
   const result = await run.start({ inputData: { brandName: name, domain, contentSources } });
 
-  if (result.status !== 'succeeded') {
+  if (result.status !== 'succeeded' && result.status !== 'success') {
     return c.json({ error: 'Brand onboarding workflow failed', details: result.error }, 500);
   }
 
-  const { brandId, personaCount, environmentCount, message } = result.result;
+  const { brandId, personaCount, environmentCount, message } = (result as any).result;
   const brand = await brandsRepo.findById(brandId);
   return c.json({ brand, personaCount, environmentCount, message }, 201);
 });
@@ -162,11 +170,11 @@ app.post('/api/brands/:brandId/cards/generate', async (c) => {
   const run = await workflow.createRunAsync();
   const result = await run.start({ inputData: { brandId } });
 
-  if (result.status !== 'succeeded') {
+  if (result.status !== 'succeeded' && result.status !== 'success') {
     return c.json({ error: 'Card generation workflow failed', details: result.error }, 500);
   }
 
-  const { cardIds, totalGenerated, totalSkipped, message } = result.result;
+  const { cardIds, totalGenerated, totalSkipped, message } = (result as any).result;
   return c.json({ cardIds, totalGenerated, totalSkipped, message }, 201);
 });
 
@@ -193,12 +201,40 @@ app.post('/api/cards/publish', async (c) => {
   const run = await workflow.createRunAsync();
   const result = await run.start({ inputData: { cardIds } });
 
-  if (result.status !== 'succeeded') {
+  if (result.status !== 'succeeded' && result.status !== 'success') {
     return c.json({ error: 'Publishing workflow failed', details: result.error }, 500);
   }
 
-  const { publishedCount, failedCount, invalidCount, publishedCardIds, message } = result.result;
+  const { publishedCount, failedCount, invalidCount, publishedCardIds, message } = (result as any).result;
   return c.json({ publishedCount, failedCount, invalidCount, publishedCardIds, message });
+});
+
+app.post('/api/cards/delete', async (c) => {
+  const body = await c.req.json();
+  const { cardIds } = parse(deleteCardsSchema, body);
+
+  let deleted = 0;
+  for (const cardId of cardIds) {
+    await cardsRepo.delete(cardId);
+    deleted++;
+  }
+
+  return c.json({ deleted });
+});
+
+app.post('/api/cards/unpublish', async (c) => {
+  const body = await c.req.json();
+  const { cardIds } = parse(unpublishCardsSchema, body);
+
+  let updated = 0;
+  for (const cardId of cardIds) {
+    const card = await cardsRepo.update(cardId, { status: 'draft', publishedAt: null });
+    if (card) {
+      updated++;
+    }
+  }
+
+  return c.json({ updated });
 });
 
 app.post('/api/content/generate', async (c) => {
@@ -265,6 +301,26 @@ app.post('/api/influencers/find-new', async () => {
       name: 'Mia Patel',
       bio: 'Yoga and mobility instructor focused on sustainable performance.',
       domain: 'Yoga & Mobility',
+    },
+    {
+      name: 'Alex Chen',
+      bio: 'CrossFit athlete and nutrition coach specializing in performance optimization.',
+      domain: 'CrossFit & Nutrition',
+    },
+    {
+      name: 'Sarah Williams',
+      bio: 'Physical therapist and movement specialist focused on corrective exercise.',
+      domain: 'Physical Therapy',
+    },
+    {
+      name: 'Marcus Johnson',
+      bio: 'Marathon runner and running coach helping athletes prevent injuries.',
+      domain: 'Running & Endurance',
+    },
+    {
+      name: 'Emma Rodriguez',
+      bio: 'Pilates instructor specializing in core strength and postural alignment.',
+      domain: 'Pilates & Core Training',
     },
   ];
 
@@ -335,12 +391,10 @@ app.get('/dataset/:brandId', async (c) => {
       : cards
           .map((card, index) => {
             const n = index + 1;
-            const influencerName = influencerMap.get(card.influencerId) || '';
             const imageUrl = card.imageUrl || '';
             return `
       <section>
         <h2>Card ${n}</h2>
-        ${influencerName ? `<p><strong>Influencer:</strong> ${escapeHtml(influencerName)}</p>` : ''}
         ${imageUrl ? `<div><img src="${escapeHtml(imageUrl)}" alt="Card ${n} image"></div>` : ''}
         <h3>Query</h3>
         <p>${escapeHtml(card.query)}</p>

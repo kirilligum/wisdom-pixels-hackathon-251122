@@ -9,12 +9,26 @@ export async function generateInfluencerImage(name: string, domain: string): Pro
     const { fal } = await import('@fal-ai/client');
     fal.config({ credentials: falKey });
 
-    const result: any = await fal.subscribe('fal-ai/alpha-image-232/text-to-image', {
-      input: {
-        prompt: `Photorealistic headshot of ${name}, ${domain} expert, professional studio lighting, neutral background, sharp focus`,
-      },
-      logs: false,
-    });
+    // Try flux-schnell first (more reliable), fall back to alpha-image-232
+    let result: any;
+    try {
+      result = await fal.subscribe('fal-ai/flux/schnell', {
+        input: {
+          prompt: `Photorealistic headshot portrait of ${name}, ${domain} expert, professional studio lighting, neutral background, sharp focus, high quality`,
+          image_size: 'square',
+          num_images: 1,
+        },
+        logs: false,
+      });
+    } catch (fluxError) {
+      console.warn(`[image-gen] flux/schnell failed for ${name}, trying alpha-image-232:`, fluxError);
+      result = await fal.subscribe('fal-ai/alpha-image-232/text-to-image', {
+        input: {
+          prompt: `Photorealistic headshot of ${name}, ${domain} expert, professional studio lighting, neutral background, sharp focus`,
+        },
+        logs: false,
+      });
+    }
 
     const url = result?.data?.images?.[0]?.url || placeholder;
     console.log(`[image-gen] headshot done for ${name}: ${url}`);
@@ -43,20 +57,35 @@ export async function generateActionImages(headshotUrl: string, name: string, do
     const results: string[] = [];
     for (const prompt of prompts) {
       try {
-        console.log(`[image-gen] edit-image call for ${name} prompt: ${prompt}`);
-        const resp: any = await fal.subscribe('fal-ai/alpha-image-232/edit-image', {
-          input: {
-            prompt,
-            image_urls: [headshotUrl],
-          },
-          logs: false,
-        });
+        console.log(`[image-gen] generating action image for ${name}`);
+        // Try text-to-image with flux first (more reliable than edit-image)
+        let resp: any;
+        try {
+          resp = await fal.subscribe('fal-ai/flux/schnell', {
+            input: {
+              prompt,
+              image_size: 'portrait_4_3',
+              num_images: 1,
+            },
+            logs: false,
+          });
+        } catch (fluxError) {
+          console.warn(`[image-gen] flux action failed for ${name}, trying edit-image:`, fluxError);
+          // Fall back to edit-image with the headshot
+          resp = await fal.subscribe('fal-ai/alpha-image-232/edit-image', {
+            input: {
+              prompt,
+              image_urls: [headshotUrl],
+            },
+            logs: false,
+          });
+        }
         const url = resp?.data?.images?.[0]?.url;
-        console.log(`[image-gen] edit-image success for ${name}: ${url}`);
-        results.push(url || placeholder);
-      } catch {
-        // If edit-image fails, keep the face reference by falling back to the headshot
-        console.warn(`[image-gen] edit-image failed for ${name}, using headshot fallback`);
+        console.log(`[image-gen] action image success for ${name}: ${url}`);
+        results.push(url || headshotUrl || placeholder);
+      } catch (error) {
+        // If all methods fail, use the headshot as fallback to maintain consistency
+        console.warn(`[image-gen] all action image methods failed for ${name}, using headshot:`, error);
         results.push(headshotUrl || placeholder);
       }
     }

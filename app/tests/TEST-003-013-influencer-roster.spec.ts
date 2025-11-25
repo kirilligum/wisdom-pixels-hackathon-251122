@@ -23,66 +23,34 @@ test.describe('Influencer Roster Tests', () => {
     expect(count).toBe(5);
   });
 
-  test('TEST-003: influencers should have enable/disable toggles', async ({ page }) => {
+  test('TEST-003: influencers should have use-in-generation toggle buttons', async ({ page }) => {
     await page.waitForTimeout(500);
 
     // Find first influencer card
     const firstInfluencer = page.locator('[data-testid="influencer-card"]').first();
     await expect(firstInfluencer).toBeVisible();
 
-    // Check for enable toggle
-    const toggle = firstInfluencer.locator('input[type="checkbox"][data-testid="enable-toggle"], button:has-text("Enable"), button:has-text("Disable")');
+    // Check for enable toggle button
+    const toggle = firstInfluencer.locator('[data-testid="enable-toggle"]');
     await expect(toggle).toBeVisible();
   });
 
-  test('TEST-003: should allow toggling influencer enabled state', async ({ page }) => {
+  test('TEST-003: should allow toggling influencer use-in-generation state', async ({ page }) => {
     await page.waitForTimeout(500);
 
     // Find first influencer card
     const firstInfluencer = page.locator('[data-testid="influencer-card"]').first();
 
-    // Find and click the enable toggle
-    const toggle = firstInfluencer.locator('input[type="checkbox"][data-testid="enable-toggle"]');
-    const initialState = await toggle.isChecked();
+    // Find and click the enable toggle button
+    const toggleButton = firstInfluencer.locator('[data-testid="enable-toggle"]');
+    const initialLabel = await toggleButton.textContent();
 
-    await toggle.click();
+    await toggleButton.click();
     await page.waitForTimeout(200);
 
-    // Verify state changed
-    const newState = await toggle.isChecked();
-    expect(newState).toBe(!initialState);
-  });
-
-  test('TEST-003: should have set default button for each influencer', async ({ page }) => {
-    await page.waitForTimeout(500);
-
-    // Find first influencer card
-    const firstInfluencer = page.locator('[data-testid="influencer-card"]').first();
-
-    // Check for set default button
-    const defaultButton = firstInfluencer.locator('button:has-text("Set Default"), button:has-text("Default"), button[data-testid="set-default-button"]');
-    await expect(defaultButton).toBeVisible();
-  });
-
-  test('TEST-003: should allow setting an influencer as default', async ({ page }) => {
-    await page.waitForTimeout(500);
-
-    // Find second influencer card
-    const secondInfluencer = page.locator('[data-testid="influencer-card"]').nth(1);
-
-    // Find and click set default button
-    const defaultButton = secondInfluencer.locator('button:has-text("Set Default"), button[data-testid="set-default-button"]');
-
-    // Check if button is clickable (not already default)
-    const isDisabled = await defaultButton.isDisabled().catch(() => false);
-    if (!isDisabled) {
-      await defaultButton.click();
-      await page.waitForTimeout(300);
-
-      // Verify default indicator appears
-      const defaultIndicator = secondInfluencer.locator('[data-testid="default-indicator"]');
-      await expect(defaultIndicator).toBeVisible();
-    }
+    // Verify label changed to indicate toggled state
+    const newLabel = await toggleButton.textContent();
+    expect(newLabel).not.toBe(initialLabel);
   });
 
   test('TEST-013: influencers should have diverse ages and roles', async ({ page }) => {

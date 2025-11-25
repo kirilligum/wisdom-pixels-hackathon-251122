@@ -33,7 +33,7 @@ Workflows orchestrate the multi-step card generation process:
 Tools provide integration with external services and utilities:
 
 - **Content Fetcher Tool**: Fetches and processes marketing content from URLs
-- **Image Generation Tool**: Integrates with FLUX 1.1 or similar image generation APIs
+- **Image Generation Tool**: Integrates with fal-ai Nano Banana Pro image generation APIs
 - **Database Tools**: CRUD operations for brands, personas, influencers, and cards
 
 **Why Tools?**
@@ -142,7 +142,7 @@ graph TB
         subgraph "Agents"
             AGENT_CONTENT[Content Analysis Agent<br/>- Extract Personas<br/>- Extract Environments<br/>- Extract Influencer Profiles]
             AGENT_CARD[Card Generation Agent<br/>- Generate Queries<br/>- Generate Responses]
-            AGENT_IMAGE[Image Prompt Agent<br/>- Create Image Prompts<br/>- Optimize for FLUX]
+            AGENT_IMAGE[Image Prompt Agent<br/>- Create Image Prompts<br/>- Optimize for Nano Banana Pro]
         end
 
         subgraph "Workflows"
@@ -165,7 +165,7 @@ graph TB
     end
 
     subgraph "External Services"
-        FLUX[FLUX 1.1 API<br/>Image Generation]
+        FLUX[Nano Banana Pro API<br/>Image Generation]
         CDN[Image CDN<br/>Cloudflare/S3]
         OPENAI[OpenAI/Anthropic<br/>LLM Services]
     end
@@ -340,7 +340,7 @@ sequenceDiagram
 
 ### 3. **Why Tools for External Services?**
    - **Reusability**: Same image generation tool used by multiple agents/workflows
-   - **Schema Validation**: Ensure image prompts match FLUX 1.1 requirements
+   - **Schema Validation**: Ensure image prompts match Nano Banana Pro requirements
    - **Error Handling**: Centralized retry logic and error messages
    - **Cost Tracking**: Monitor API usage per tool
 
@@ -381,7 +381,7 @@ sequenceDiagram
 ### **Phase 3: Card Generation**
 - Implement Card Generation Agent
 - Implement Image Prompt Agent
-- Integrate Image Generation Tool (FLUX 1.1 API)
+- Integrate Image Generation Tool (Nano Banana Pro API)
 - Implement Card Generation Workflow
 
 ### **Phase 4: Human-in-the-Loop**
@@ -409,7 +409,7 @@ sequenceDiagram
 | **Storage** | Static JSON | LibSQL → PostgreSQL |
 | **Memory** | N/A | Mastra Memory |
 | **RAG** | N/A | Future: Mastra RAG |
-| **Image Gen** | Pre-generated | FLUX 1.1 API |
+| **Image Gen** | Pre-generated | Nano Banana Pro API |
 | **Image Hosting** | Local/Vercel | Cloudflare R2 / S3 + CDN |
 | **LLM Provider** | N/A | OpenAI / Anthropic |
 | **Deployment** | Vercel | Vercel / Cloud Run |
@@ -424,6 +424,6 @@ sequenceDiagram
 4. **Build Brand Onboarding Workflow** with single-step extraction
 5. **Add suspend/resume** for human review
 6. **Implement Card Generation Workflow** with text generation first
-7. **Integrate FLUX 1.1** via Image Generation Tool
+7. **Integrate Nano Banana Pro** via Image Generation Tool
 8. **Add Memory** for multi-turn conversations
 9. **Scale to production** with PostgreSQL and monitoring
