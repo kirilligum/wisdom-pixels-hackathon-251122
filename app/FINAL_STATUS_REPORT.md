@@ -24,7 +24,7 @@ Successfully completed Phases M1-M5 and made significant progress on M6-M8. The 
 ### Phase M2: Infrastructure Tools (77%)
 - ✅ DbTool - Database access wrapper
 - ✅ ContentFetcherTool - Web scraping
-- ✅ ImageGenerationTool - FLUX AI image generation
+- ✅ ImageGenerationTool - Nano Banana Pro image generation (with reference images; FLUX 2 used during the hackathon but is now disabled)
 - ✅ UrlSlugTool - URL slug generation
 - ✅ All tools use Mastra's createTool API
 - ✅ Fixed Zod v4 compatibility issues
@@ -36,7 +36,7 @@ Successfully completed Phases M1-M5 and made significant progress on M6-M8. The 
 - ✅ CardQueryAgent - Generate training card questions
 - ✅ CardAnswerAgent - Generate influencer responses
 - ✅ SafetyAgent - Content safety review
-- ✅ ImageBriefAgent - FLUX prompt generation
+- ✅ ImageBriefAgent - image‑prompt generation for Nano Banana Pro (originally tuned for FLUX 2 / Alpha Image 232 during the hackathon)
 - ✅ All agents use updated model configuration (claude-haiku-4-5 default, gpt-4o-mini fallback)
 - ✅ **Tests**: 18/18 passing
 
@@ -57,7 +57,7 @@ Successfully completed Phases M1-M5 and made significant progress on M6-M8. The 
 - ✅ GET /api/brands/:brandId/cards - List cards with filters
 - ✅ GET /api/cards/:cardId - Get card details
 - ✅ POST /api/cards/publish - Publish cards
-- ✅ Express.js server running on port 3001
+- ✅ Hono server running on port 3001
 - ✅ CORS enabled, Zod validation, error handling
 - ⚠️ **Tests**: Need implementation
 

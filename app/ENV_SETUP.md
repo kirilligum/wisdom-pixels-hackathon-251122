@@ -29,24 +29,23 @@ VITE_FALAI_API_KEY=your_fal_api_key_here
 
 **Important:** Only variables prefixed with `VITE_` are exposed to the frontend. Never expose sensitive keys this way in production - use backend API endpoints instead.
 
-### Complete .env Example
+### Complete .env Example (for local demo)
 
 ```bash
-# AI Model Keys
-OPENAI_API_KEY=your_openai_key
-# OR
-ANTHROPIC_API_KEY=your_anthropic_key
+# AI Model Keys (pick one provider)
+OPENAI_API_KEY=your_openai_key          # or
+# ANTHROPIC_API_KEY=your_anthropic_key
 
-# FAL.ai Image Generation (Backend)
-FAL_KEY=your_fal_key
-# OR
-FALAI_API_KEY=your_fal_key
+# FAL.ai Image Generation (Backend – required for workflows)
+FAL_KEY=your_fal_key                    # or
+# FALAI_API_KEY=your_fal_key
 
-# FAL.ai Image Generation (Frontend - Optional)
+# FAL.ai Image Generation (Frontend - optional playground)
 VITE_FALAI_API_KEY=your_fal_key
 
-# API Configuration
-VITE_MASTRA_API_URL=http://localhost:4111
+# API Configuration (Hono REST API)
+API_PORT=3001
+VITE_API_URL=http://localhost:3001
 ```
 
 ## Getting Your FAL API Key
@@ -70,4 +69,3 @@ After setting up your `.env` file:
 - ✅ **Backend keys** (`FAL_KEY`, `FALAI_API_KEY`): Safe - never exposed to browser
 - ⚠️ **Frontend keys** (`VITE_FALAI_API_KEY`): Exposed in browser - only use for development/demos
 - 🔒 **Production**: Always use backend API endpoints, never expose API keys to frontend
-

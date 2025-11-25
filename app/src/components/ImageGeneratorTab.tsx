@@ -38,11 +38,14 @@ export default function ImageGeneratorTab({ brandName }: { brandName: string }) 
         credentials: apiKey
       });
 
-      const result = await fal.subscribe('fal-ai/flux/schnell', {
+      // Default: Nano Banana Pro (text-to-image)
+      const result = await fal.subscribe('fal-ai/nano-banana-pro', {
         input: {
-          prompt: prompt,
-          image_size: 'landscape_4_3',
-          num_inference_steps: 4
+          prompt,
+          num_images: 1,
+          aspect_ratio: '4:3',
+          output_format: 'png',
+          resolution: '1K'
         },
         logs: true,
         onQueueUpdate: (update) => {
@@ -51,6 +54,21 @@ export default function ImageGeneratorTab({ brandName }: { brandName: string }) 
           }
         }
       });
+
+      // Historical note:
+      // This demo was originally built against a FLUX 2 /
+      // Alpha Image 232 endpoint, which is currently turned off.
+      // If/when it becomes available again, this call can be
+      // switched back to a FLUX model, e.g.:
+      //
+      // const result = await fal.subscribe('fal-ai/alpha-image-232/edit-image', {
+      //   input: {
+      //     prompt,
+      //     image_size: 'landscape_4_3',
+      //     output_format: 'png'
+      //   },
+      //   logs: true
+      // });
 
       if (result.data && result.data.images && result.data.images.length > 0) {
         const newImage = {

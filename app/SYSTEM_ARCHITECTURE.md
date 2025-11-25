@@ -26,7 +26,7 @@ Wisdom Pixels is an AI-powered training card generation system that creates pers
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                     API LAYER                               │
-│  Express.js REST API (Port 3001)                            │
+│  Hono REST API (Port 3001)                                  │
 │  - 8 REST endpoints                                         │
 │  - Zod request validation                                   │
 │  - CORS + error handling                                    │
@@ -287,7 +287,7 @@ All endpoints use:
 
 ### Backend
 - **Mastra 0.18.5** - Multi-agent orchestration
-- **Express.js 4.21** - REST API server
+- **Hono** - REST API server on Node.js
 - **Node.js 20** - JavaScript runtime
 
 ### Database

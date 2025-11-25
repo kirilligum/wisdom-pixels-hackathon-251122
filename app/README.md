@@ -1,6 +1,9 @@
 # Wisdom Pixels - AI-Powered Training Card Platform
 
-**Hackathon Project**: Mastra + Nano Banana Pro Integration
+> For the high-level product story and demo instructions, see `../README.md`.  
+> This file focuses on the internal architecture and implementation details of the app in `app/`.
+
+**Hackathon Project**: Mastra + Nano Banana Pro Integration  
 **Tech Stack**: React 19 + TypeScript + Vite + Mastra + fal.ai Nano Banana Pro + Drizzle ORM + SQLite
 
 ---
@@ -83,11 +86,10 @@ Wisdom Pixels is an agentic AI platform that generates branded training cards fe
 ┌──────────────────────────────────────────────────────────────────┐
 │                    EXTERNAL SERVICES                              │
 │                                                                    │
-│  ┌──────────────────┐    ┌────────────────────┐                 │
-│  │  fal.ai Nano Banana Pro │ │  OpenAI / Claude   │                 │
-│  │  alpha-image-232 │    │  (LLM for agents)  │                 │
-│  │  /edit-image     │    │                    │                 │
-│  └──────────────────┘    └────────────────────┘                 │
+│  ┌────────────────────────┐    ┌────────────────────┐           │
+│  │  fal.ai Nano Banana Pro │    │  OpenAI / Claude   │           │
+│  │  (text + edit endpoints)│    │  (LLM for agents)  │           │
+│  └────────────────────────┘    └────────────────────┘           │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -352,24 +354,29 @@ app/
 # Node.js 20.x required
 node --version  # v20.17.0
 
-# Install dependencies
+# Install dependencies (from this directory)
 npm install
 
-# Set up environment variables
-cp .env.example .env
+# Create .env and configure keys (see ENV_SETUP.md for details)
+touch .env
 ```
 
 ### Environment Variables
 
 ```bash
-# OpenAI (for agents)
-OPENAI_API_KEY=sk-...
+# One provider for LLMs (agents & workflows)
+OPENAI_API_KEY=your_openai_key_here          # or
+# ANTHROPIC_API_KEY=your_anthropic_key_here
 
-# OR use Claude instead
-# ANTHROPIC_API_KEY=sk-ant-...
+# fal.ai (image generation for workflows – backend)
+FAL_KEY=your_fal_key_here                    # or
+# FALAI_API_KEY=your_fal_key_here
 
-# fal.ai (for image generation)
-FAL_KEY=your_fal_key_here
+# Hono API base URL for the React app
+VITE_API_URL=http://localhost:3001
+
+# Optional: expose FAL key to the Image Generator tab (demo only)
+VITE_FALAI_API_KEY=your_fal_key_here
 ```
 
 ### Database Setup
@@ -391,8 +398,11 @@ npm run db:seed
 # Start frontend dev server (http://localhost:5173)
 npm run dev
 
-# Start Mastra dev server (http://localhost:4111)
+# Start Mastra dev server (agents & workflows playground, http://localhost:4111)
 npm run dev:mastra
+
+# Start Hono REST API (http://localhost:3001)
+npm run dev:api
 
 # Run tests
 npm run test          # Jest unit tests
@@ -434,18 +444,9 @@ npm run test:m2       # Phase M2 tool tests
 
 ## 📊 Current Progress
 
-| Phase | Description | Status | Tests |
-|-------|-------------|--------|-------|
-| M1 | Database Foundation | ✅ COMPLETE | 27/27 ✅ |
-| M2 | Infrastructure Tools | ✅ COMPLETE | 25/25 ✅ |
-| M3 | Specialized Agents | 🚧 NEXT | 0/15 |
-| M4 | Workflows | ⏳ PENDING | 0/12 |
-| M5 | REST API | ⏳ PENDING | 0/10 |
-| M6 | Frontend Migration | ⏳ PENDING | 47/47 ✅ |
-| M7 | Test Alignment | ⏳ PENDING | 0/20 |
-| M8 | Documentation | ⏳ PENDING | - |
-
-**Overall**: 30% implementation complete (Phases M1-M2 done, M3-M8 in progress)
+- Core database, infrastructure tools, specialized agents, workflows, Hono REST API, and the React frontend are implemented and wired together.
+- Tests exist for the DB, tools, agents, workflows, API, and E2E flows; some suites still need cleanup and alignment with the PRD.
+- For an up‑to‑date, phase‑by‑phase breakdown (M1–M8) and detailed test counts, see `IMPLEMENTATION_STATUS.md` and `FINAL_STATUS_REPORT.md`.
 
 ---
 

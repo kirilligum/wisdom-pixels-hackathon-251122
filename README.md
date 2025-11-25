@@ -55,8 +55,17 @@ Each Wisdom Card is both:
 For the demo we built **FlowForm**, a fictional 10‑sensor motion suit for yoga, strength, and running, aimed at desk‑bound knowledge workers. Wisdom Pixels uses:
 
 - **Mastra agents** for content understanding, persona/env extraction, and copy generation.
-- **fal.ai / FLUX (alpha-image-232)** for photorealistic product + influencer scenes.
+- **fal.ai Nano Banana Pro** for photorealistic product + influencer scenes (current default model).
 - A **React frontend** to browse cards as a gallery, view detail pages, and open full‑size images.
+
+### Problem: Feeds vs AI surfaces
+
+- Today, **influencer marketing runs through feeds** (TikTok, Instagram, YouTube), where targeting is mainly by keywords, tags, and rough segments, and content disappears quickly in the scroll.
+- At the same time, **AI surfaces (ChatGPT, LLM search, assistants)** are becoming the place where people ask, “What should I buy?” and “How should I train?”—but brands have almost no way to shape these answers.
+- Wisdom Pixels turns a brand’s marketing content into **persona‑ and environment‑aware training cards**, so that future AI systems can answer with:
+  - the right **persona** (“WFH yoga creative” vs “late‑start runner”),
+  - the right **environment** (small apartment, park loop, clinic),
+  - and a **familiar influencer face** wearing/using the product.
 
 ---
 
@@ -147,7 +156,7 @@ Entry: `api/index.ts` (served by `tsx watch api/index.ts`):
     - `anthropic/claude-haiku-4-5` if `ANTHROPIC_API_KEY` is set, else  
     - `openai/gpt-4o-mini` if `OPENAI_API_KEY` is set.
   - Uses tools from `mastra/tools/content-tool.ts` to generate personas, environments, and training cards.
-- `mastra/tools/image-generation-tool.ts` – image generation with **fal-ai/alpha-image-232/edit-image**, including reference images for influencer consistency.
+- `mastra/tools/image-generation-tool.ts` – image generation with **fal-ai/nano-banana-pro** (text) and **fal-ai/nano-banana-pro/edit** (image edit), including reference images for influencer consistency.
 - `mastra/workflows/*` – workflows for brand onboarding, card generation, and publishing.
 
 **Data / DB layer**
@@ -185,7 +194,7 @@ flowchart LR
 
 2. **Configure influencers & images**  
    In the Influencers tab, the brand (or demo) adds synthetic influencer profiles via the API.  
-   The API calls fal.ai (Alpha Image 232) to generate:
+   The API calls fal.ai Nano Banana Pro to generate:
    - headshots,
    - action shots (yoga, strength, running),  
    and saves their URLs in the influencers table.  
@@ -211,6 +220,16 @@ flowchart LR
    - `image` = URL to the FlowForm + influencer scene.  
    This is what Wisdom Pixels ultimately produces for AI search / recommender training.
 
+### Influencer scoring (prototype)
+
+The repo also contains experimental JSON files under `app/public/json/` (for example `priya_nair.json`) that demonstrate how we might score influencers for:
+
+- `semanticFit` – how well their content semantically matches the brand and product.
+- `datasetDiversity` – how much new coverage they add to the existing dataset.
+- `partners` / `competitors` – brands they’ve worked with or overlap with.
+
+These scores are **not yet wired into the UI**; they are design prototypes for a future “influencer scoring” module.
+
 ---
 
 ## Tech Stack
@@ -221,7 +240,8 @@ flowchart LR
 - **LLMs**:
   - Anthropic Claude Haiku 4.5 (`anthropic/claude-haiku-4-5`) or  
   - OpenAI GPT‑4o‑mini (`openai/gpt-4o-mini`), chosen via env vars.  
-- **Image generation**: fal.ai Alpha Image 232 (`fal-ai/alpha-image-232/edit-image`) via `@fal-ai/client`.  
+- **Image generation (current)**: fal.ai Nano Banana Pro (`fal-ai/nano-banana-pro` and `fal-ai/nano-banana-pro/edit`) via `@fal-ai/client`.  
+- **Image generation (hackathon, retired)**: originally built against **fal.ai / BFL FLUX 2 (Alpha Image 232)**. That endpoint was turned off after the hackathon; the FLUX call is kept commented out in the image playground as a reference.
 - **Database**: SQLite + drizzle‑orm + better-sqlite3.
 
 ---
@@ -242,15 +262,26 @@ npm install
 Create `app/.env` if it doesn’t exist and set at least:
 
 ```bash
-ANTHROPIC_API_KEY=your_anthropic_key_here   # or OPENAI_API_KEY
-FALAI_API_KEY=your_fal_key_here             # or FAL_KEY
+# One of these (for LLMs powering agents/workflows)
+OPENAI_API_KEY=your_openai_key_here          # or
+# ANTHROPIC_API_KEY=your_anthropic_key_here
+
+# FAL.ai image generation for workflows (backend)
+FAL_KEY=your_fal_key_here                    # or
+# FALAI_API_KEY=your_fal_key_here
+
+# API base URL for the React app
 VITE_API_URL=http://localhost:3001
+
+# Optional: FAL key in the browser for the Image Generator tab only
+# (development/demo only – this exposes the key to the client)
+VITE_FALAI_API_KEY=your_fal_key_here
 ```
 
 The demo will:
 
 - Use Anthropic if `ANTHROPIC_API_KEY` is set, otherwise OpenAI if `OPENAI_API_KEY` is set.  
-- Use fal.ai for image generation if `FALAI_API_KEY`/`FAL_KEY` is set; otherwise fall back to placeholders.
+- Use fal.ai Nano Banana Pro for image generation if `FAL_KEY`/`FALAI_API_KEY` is set; otherwise fall back to placeholders in some flows.
 
 ### 3. Initialize the database
 
@@ -299,6 +330,21 @@ Then open `http://localhost:5173` and:
 - Use **Influencers** to add/delete influencers, toggle Enabled, and view galleries.  
 - Use **Cards** to browse Wisdom Cards (image + query + response + status).
 
+### Dataset HTML endpoint (for AI crawlers)
+
+When you publish cards for a brand, the API can serve a simple HTML “dataset page” that is meant to be crawlable by AI systems:
+
+- Endpoint: `GET /dataset/:brandId` (served by the Hono API at `http://localhost:3001`).  
+- This page contains:
+  - narrative instructions for LLM trainers, and  
+  - each card’s query, answer, and image in a crawl‑friendly format.
+
+For the FlowForm demo:
+
+1. Open the FlowForm Brand Dashboard in the UI.  
+2. Copy the `brandId` from the URL (`/brand/<brandId>/cards`).  
+3. Open `http://localhost:3001/dataset/<brandId>` in a browser.
+
 ---
 
 ## Tests
@@ -325,5 +371,7 @@ This runs Jest unit tests for:
   - Static assets can be placed under `app/public/images/...` (e.g., `images/influencers`, `images/cards`, `images/product`).
 - v0 uses **synthetic influencer personas** only. Real influencer contracts, payments, and compliance controls are deliberately out of scope.
 - Image generation and usage should be treated as demo‑only; production use would require stricter controls around likeness, rights, and safety.
+- The original hackathon build used **BFL FLUX 2 / Alpha Image 232** for image generation; after that model was turned off, the project switched to **Nano Banana Pro** as the default. The old FLUX call is still present as commented‑out code for future experiments.
+- Influencer licensing and an explicit **brand‑AI ↔ influencer‑AI handshake protocol** are not implemented yet. A separate PRD describing this future flow lives at `prds/influencer-licensing-handshake.md`.
 
 If you’re reviewing this for the hackathon, the key idea is how **Wisdom Pixels** turns a single product’s marketing content into a structured, influencer‑backed, multi‑modal dataset—ready to inform how AI assistants *talk about* and *visualize* that product.***

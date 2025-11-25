@@ -4,6 +4,9 @@
 
 This directory contains all planning, requirements, and execution documents for the Wisdom Pixels project - an AI-powered platform for generating branded training cards with influencer endorsements and photorealistic images.
 
+> Note: The current implementation uses a **Hono** REST API on Node.js.  
+> Older planning documents in this folder may still mention Express/Fastify; treat those as architectural equivalents rather than literal implementation requirements.
+
 ## Document Hierarchy
 
 ```

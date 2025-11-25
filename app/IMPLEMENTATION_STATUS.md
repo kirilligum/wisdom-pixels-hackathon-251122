@@ -85,7 +85,7 @@ Four specialized tools that wrap core infrastructure for agent access:
    - **Used by**: ContentAnalysisAgent for brand schema extraction
 
 3. **ImageGenerationTool** (`mastra/tools/image-generation-tool.ts`)
-   - **FLUX alpha-image-232/edit-image integration**
+   - **Nano Banana Pro integration** (`fal-ai/nano-banana-pro` and `/edit`)
    - **Key Innovation**: Supports `referenceImageUrls[]` for consistent influencer appearance
    - Configurable: image size, inference steps, guidance scale
    - Safety checker enabled
@@ -110,7 +110,7 @@ Four specialized tools that wrap core infrastructure for agent access:
 - ✅ All tools use Mastra's `createTool` API
 - ✅ Full Zod schema validation
 - ✅ Error handling with descriptive messages
-- ✅ FLUX model correctly configured (alpha-image-232/edit-image)
+- ✅ Nano Banana Pro model correctly configured (`fal-ai/nano-banana-pro` + `/edit`; FLUX 2 / Alpha Image 232 was used during the hackathon but is now disabled)
 
 ---
 
@@ -151,7 +151,7 @@ Four specialized tools that wrap core infrastructure for agent access:
    - **REQ-106**: Safety review before card generation ✅
 
 5. **ImageBriefAgent** (`mastra/agents/image-brief-agent.ts`)
-   - Generates FLUX prompts for photorealistic product images
+   - Generates image prompts for photorealistic product images (tuned for Nano Banana Pro; originally used FLUX 2 / Alpha Image 232 during the hackathon)
    - Includes influencer reference image URLs for consistent appearance
    - Specifies environment details and brand/product visibility
    - Tools: ImageGenerationTool, DbTool
@@ -227,7 +227,7 @@ Four specialized tools that wrap core infrastructure for agent access:
 ### Phase M5: REST API (100%) ✅
 
 **What We Built**:
-Express.js REST API server with 8 endpoints + health check:
+Hono REST API server with 8 endpoints + health check:
 
 1. **POST /api/brands** - Create brand + run BrandOnboardingWorkflow
    - Input: `name`, `domain`, `contentSources[]`
@@ -263,8 +263,7 @@ Express.js REST API server with 8 endpoints + health check:
    - Returns: `{ status: "ok", timestamp: <unix-ms> }`
 
 **Implementation Details**:
-- `api/server.ts` - Express.js server with all endpoints
-- `api/index.ts` - Entry point for starting the server
+- `api/index.ts` - Hono server with all endpoints
 - **Middleware**: CORS enabled, JSON body parsing, error handling
 - **Validation**: Zod schemas for all request bodies
 - **Error Handling**: Async error wrapper with 400/404/500 responses
@@ -292,52 +291,21 @@ Express.js REST API server with 8 endpoints + health check:
 
 ---
 
-### Phase M6: Frontend Migration (0%)
-
-**What Needs To Be Done**:
-- Create API client wrapper (`src/lib/api-client.ts`)
-- Update React components to call REST API instead of direct Mastra
-- Remove `@mastra/client-js` dependency from frontend
-- Update existing 47 Playwright tests to work with API
+### Phase M6: Frontend Migration (in progress)
 
 **Current State**:
+- ✅ API client wrapper exists (`src/lib/api-client.ts`) and is used by core pages (`HomePage`, `BrandSetup`, `BrandDashboard`, `CardDetail`)
 - ✅ Frontend UI is complete (React 19 + TypeScript)
-- ✅ 47 Playwright E2E tests passing
-- ⚠️ Uses mock data + simple Mastra integration (1 agent)
-- ⏳ Needs migration to REST API
+- ✅ 47 Playwright E2E tests passing against the current stack
+- ⏳ `@mastra/client-js` can now be removed from the frontend (no direct calls)
 
-**Estimated Time**: 2-3 days
-**Tests Needed**: 47 E2E tests already exist, need updates
+### Phase M7: Test Alignment (pending)
 
----
+- Remaining work is mostly about aligning test IDs and PRD references, plus adding a few missing integration tests for workflows and the API.
 
-### Phase M7: Test Alignment (0%)
+### Phase M8: Documentation (in progress)
 
-**What Needs To Be Done**:
-- Align test IDs with PRD (TEST-001, TEST-002, etc.)
-- Create missing PRD tests
-- Validate Requirements Traceability Matrix (RTM)
-- Performance testing (card list < 500ms)
-- Comprehensive test suite
-
-**Estimated Time**: 2-3 days
-**Tests Needed**: 20 tests to align with PRD
-
----
-
-### Phase M8: Documentation (50%)
-
-**What's Done**:
-- ✅ Comprehensive README.md with architecture diagrams
-- ✅ Database ER diagram
-- ✅ Technology stack documentation
-- ✅ Getting started guide
-
-**What's Needed**:
-- API documentation (OpenAPI/Swagger)
-- Agent/workflow documentation
-- Deployment guide
-- Final validation checklist
+- Most architectural and setup docs exist (`README.md`, `ENV_SETUP.md`, `SYSTEM_ARCHITECTURE.md`, `IMPLEMENTATION_STATUS.md`), but API reference and deployment guides are still future work.
 
 **Estimated Time**: 1-2 days
 
