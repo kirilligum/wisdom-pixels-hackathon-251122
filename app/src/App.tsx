@@ -14,6 +14,7 @@ function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -37,6 +38,7 @@ function App() {
       setError('');
     } else {
       setError('Invalid credentials.');
+      setShowHint(true);
     }
   };
 
@@ -48,27 +50,45 @@ function App() {
 
   if (!loggedIn) {
     return (
-      <div className="app-container">
-        <div className="main-card-wrapper">
-          <h1 className="main-title">Wisdom Pixels</h1>
-          <div className="action-card">
-            <p className="action-text">Login to manage brands, influencers, and cards.</p>
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username"
-                style={{ padding: '0.9rem 1rem', borderRadius: '10px', border: '1px solid #3a3f4b', background: '#1f232c', color: '#e2e8f0' }}
-              />
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                placeholder="Password"
-                style={{ padding: '0.9rem 1rem', borderRadius: '10px', border: '1px solid #3a3f4b', background: '#1f232c', color: '#e2e8f0' }}
-              />
-              {error && <div style={{ color: '#fc8181', fontWeight: 600 }}>{error}</div>}
-              <button type="submit" className="button login">Login</button>
+      <div className="login-shell">
+        <div className="login-panel">
+          <div className="login-brand">
+            <div className="login-mark" />
+            <div>
+              <div className="login-title">Wisdom Pixels</div>
+              <div className="login-subtitle">Multi-modal influencer training cards</div>
+            </div>
+          </div>
+          <div className="login-card">
+            <h1>Sign in</h1>
+            <p>Sign in to review brands, influencers, and cards.</p>
+            <form onSubmit={handleLogin} className="login-form">
+              <label className="login-label">
+                Username
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="guest"
+                  className="login-input"
+                />
+              </label>
+              <label className="login-label">
+                Password
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type="password"
+                  placeholder="••••••••"
+                  className="login-input"
+                />
+              </label>
+              {error && (
+                <div className="login-error">
+                  {error}
+                  {showHint ? ' Hint: check your team credentials.' : ''}
+                </div>
+              )}
+              <button type="submit" className="login-button">Continue</button>
             </form>
           </div>
         </div>

@@ -46,6 +46,7 @@ export default function CardDetail() {
           // Fall back to seed data if API not available
           const seedCard = flowformSeed.cards.find((c: any) => c.id === id);
           if (seedCard) {
+            const seedAny = seedCard as any;
             fetchedCard = {
               cardId: seedCard.id,
               brandId: seedCard.brandId,
@@ -55,10 +56,9 @@ export default function CardDetail() {
               query: seedCard.query,
               response: seedCard.response,
               imageUrl: seedCard.imageUrl,
-              imageBrief: seedCard.imageBrief ?? '',
+              imageBrief: seedAny.imageBrief ?? '',
               status: (seedCard.status as any) ?? 'draft',
               viewCount: seedCard.viewCount ?? 0,
-              shareCount: seedCard.shareCount ?? 0,
             };
             brandData = {
               brand: {
@@ -102,10 +102,9 @@ export default function CardDetail() {
                 query: c.query,
                 response: c.response,
                 imageUrl: c.imageUrl,
-                imageBrief: c.imageBrief ?? '',
+                imageBrief: (c as any).imageBrief ?? '',
                 status: (c.status as any) ?? 'draft',
                 viewCount: c.viewCount ?? 0,
-                shareCount: c.shareCount ?? 0,
               })),
             };
           } else {

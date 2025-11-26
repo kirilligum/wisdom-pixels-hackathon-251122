@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { BrandData, Persona, Environment, Influencer, Card } from '../types';
 import CardGallery from '../components/CardGallery';
 import { apiClient } from '../lib/api-client';
@@ -607,12 +607,17 @@ export default function BrandDashboard() {
     }
   };
 
-  const handlePublishDataset = () => {
-    if (!data) return;
+  // Ensure dataset link is available once data is loaded
+  useEffect(() => {
+    const id = brandId || data?.brand.brandId;
+    if (!id) return;
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const url = `${baseUrl}/dataset/${data.brand.brandId}`;
-    setDatasetUrl(url);
-  };
+    const datasetBase = baseUrl.endsWith('/api') ? baseUrl.replace(/\/api\/?$/, '') : baseUrl;
+    const url = `${datasetBase}/api/dataset/${id}`;
+    if (datasetUrl !== url) {
+      setDatasetUrl(url);
+    }
+  }, [brandId, data, datasetUrl]);
 
   if (loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
@@ -635,6 +640,13 @@ export default function BrandDashboard() {
     fontSize: '1rem',
     fontWeight: isActive ? 'bold' : 'normal',
   });
+
+  const datasetHref = (() => {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const datasetBase = baseUrl.endsWith('/api') ? baseUrl.replace(/\/api\/?$/, '') : baseUrl;
+    const id = brandId ?? data?.brand.brandId;
+    return id ? `${datasetBase}/api/dataset/${id}` : '#';
+  })();
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
@@ -854,43 +866,23 @@ export default function BrandDashboard() {
                 {isGeneratingDataset ? 'Generating…' : 'Generate Dataset'}
               </button>
 
-              {datasetUrl ? (
-                <a
-                  href={datasetUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    padding: '0.6rem 1.25rem',
-                    background: '#28a745',
-                    color: 'white',
-                    borderRadius: '4px',
-                    textDecoration: 'none',
-                    fontWeight: 'bold',
-                    fontSize: '0.95rem',
-                  }}
-                  title="Open published dataset page in a new tab"
-                >
-                  Open Dataset Page
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handlePublishDataset}
-                  style={{
-                    padding: '0.6rem 1.25rem',
-                    background: '#6c757d',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '0.95rem',
-                  }}
-                  title="Publish this brand's cards as a crawlable dataset page"
-                >
-                  Publish
-                </button>
-              )}
+              <a
+                href={datasetUrl || datasetHref}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  padding: '0.6rem 1.25rem',
+                  background: '#28a745',
+                  color: 'white',
+                  borderRadius: '4px',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                  fontSize: '0.95rem',
+                }}
+                title="Open published dataset page in a new tab"
+              >
+                Open Dataset Page
+              </a>
             </div>
 
             <CardGallery
@@ -902,23 +894,6 @@ export default function BrandDashboard() {
               onToggleSelected={toggleCardSelection}
             />
           </>
-        )}
-        {activeTab === 'publish' && (
-          <PublishTab
-            cards={data.cards}
-            cardStatuses={cardStatuses}
-            selectedCards={selectedCards}
-            onToggleSelection={toggleCardSelection}
-            onPublish={handlePublishSelected}
-            onDeleteSelected={handleDeleteSelected}
-            onSelectAll={selectAllCards}
-            onClearSelection={clearCardSelection}
-            searchTerm={cardSearch}
-            onSearchChange={setCardSearch}
-          />
-        )}
-        {activeTab === 'ai' && (
-          <AIContentTab />
         )}
       </div>
 
@@ -1341,77 +1316,6 @@ export function PublishTab({
             </div>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-function AIContentTab() {
-  const [prompt, setPrompt] = useState('');
-  const [loading, setLoading] = useState(false);
-  const examplePrompts = [
-    'Write a customer persona for a busy parent who uses FlowForm for 10-minute workouts.',
-    'Describe a training environment for yoga in a small apartment with FlowForm.',
-    'Draft a training card about improving running form with FlowForm Motion Suit.',
-    'Explain how professional athletes can use FlowForm for recovery sessions.',
-  ];
-
-  const handleExample = (text: string) => {
-    setPrompt(text);
-  };
-
-  const handleGenerate = () => {
-    setLoading(true);
-    setTimeout(() => setLoading(false), 800);
-  };
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
-      <div style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e9ecef' }}>
-        <div style={{ marginBottom: '0.5rem', fontWeight: 'bold' }}>Example Prompts</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-          {examplePrompts.map((p, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => handleExample(p)}
-              style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #ced4da', cursor: 'pointer' }}
-            >
-              {p.includes('persona') ? 'customer persona' :
-               p.includes('environment') ? 'training environment' :
-               p.includes('athletes') ? 'professional athletes' : 'training card'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e9ecef', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <textarea
-          placeholder="Enter a prompt to generate content..."
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          rows={5}
-          style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ced4da', fontSize: '1rem', fontFamily: 'inherit' }}
-        />
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={!prompt || loading}
-            style={{
-              padding: '0.7rem 1.5rem',
-              borderRadius: '6px',
-              border: 'none',
-              background: loading ? '#6c757d' : '#007bff',
-              color: 'white',
-              cursor: (!prompt || loading) ? 'not-allowed' : 'pointer',
-              fontWeight: 'bold'
-            }}
-          >
-            {loading ? 'Generating...' : 'Generate Content'}
-          </button>
-          <span style={{ color: '#6c757d' }}>Mastra Backend Required — run <code>npm run dev:mastra</code></span>
-        </div>
       </div>
     </div>
   );

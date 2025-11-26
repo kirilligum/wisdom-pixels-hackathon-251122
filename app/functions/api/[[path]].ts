@@ -1,18 +1,18 @@
-import { handle } from 'hono/cloudflare-pages';
-
 type Env = {
   DB: D1Database;
-  AUTH0_DOMAIN: string;
-  AUTH0_AUDIENCE: string;
+  AUTH0_DOMAIN?: string;
+  AUTH0_AUDIENCE?: string;
   ALLOWED_ORIGINS?: string;
   DISABLE_AUTH?: string;
   DISABLE_API?: string;
 };
 
-export const onRequest = handle<Env>(async (c) => {
-  // Allow disabling API to ensure Pages deploys even if edge-incompatible deps exist.
-  if (c.env.DISABLE_API === '1') {
-    return new Response(JSON.stringify({ error: 'API disabled' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+export const onRequest = async (context: any) => {
+  if (context.env.DISABLE_API === '1') {
+    return new Response(JSON.stringify({ error: 'API disabled' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   try {
@@ -23,15 +23,15 @@ export const onRequest = handle<Env>(async (c) => {
     ]);
 
     const config = loadApiConfig({
-      AUTH0_DOMAIN: c.env.AUTH0_DOMAIN,
-      AUTH0_AUDIENCE: c.env.AUTH0_AUDIENCE,
-      ALLOWED_ORIGINS: c.env.ALLOWED_ORIGINS,
-      DISABLE_AUTH: c.env.DISABLE_AUTH,
+      AUTH0_DOMAIN: context.env.AUTH0_DOMAIN,
+      AUTH0_AUDIENCE: context.env.AUTH0_AUDIENCE,
+      ALLOWED_ORIGINS: context.env.ALLOWED_ORIGINS,
+      DISABLE_AUTH: context.env.DISABLE_AUTH,
     });
 
-    const db = createD1Db(c.env.DB);
+    const db = createD1Db(context.env.DB);
     const api = createApiApp({ db, config });
-    return api.fetch(c.req.raw, c.env, c.executionCtx);
+    return api.fetch(context.request, context.env as any, context);
   } catch (err: any) {
     console.error('[api] failed to initialize', err?.message || err);
     return new Response(JSON.stringify({ error: 'API unavailable', detail: err?.message || 'init failed' }), {
@@ -39,4 +39,4 @@ export const onRequest = handle<Env>(async (c) => {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-});
+};
