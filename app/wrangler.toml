@@ -1,0 +1,21 @@
+name = "wisdom-pixels-app"
+compatibility_date = "2025-02-05"
+pages_build_output_dir = "dist"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+# D1 binding
+binding = "DB"
+database_name = "wisdom-pixels"
+database_id = "6b05b0e9-7fa8-42ca-a121-72c7b5452821"
+migrations_dir = "mastra/db/migrations"
+
+# Uncomment and configure if you add KV
+# [[kv_namespaces]]
+# binding = "STATE"
+# id = "<replace-with-kv-id>"
+
+# Uncomment and configure if you add R2
+# [[r2_buckets]]
+# binding = "ASSETS"
+# bucket_name = "<replace-with-r2-bucket>"

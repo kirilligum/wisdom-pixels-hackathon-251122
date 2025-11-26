@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import * as schema from './schema';
 import path from 'path';
 import fs from 'fs';
+import type { Database as DbType } from './types';
 
 // Ensure .data directory exists
 const dataDir = path.join(process.cwd(), '.data');
@@ -23,7 +24,7 @@ sqlite.pragma('foreign_keys = ON');
 export const db = drizzle(sqlite, { schema });
 
 // Export types
-export type Database = typeof db;
+export type Database = DbType;
 
 // Graceful shutdown
 process.on('SIGINT', () => {

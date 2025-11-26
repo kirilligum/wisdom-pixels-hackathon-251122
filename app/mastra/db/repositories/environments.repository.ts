@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm';
-import type { Database } from '../client';
+import type { Database } from '../types';
 import { environments, type Environment, type NewEnvironment } from '../schema';
-import { randomUUID } from 'crypto';
 
 export class EnvironmentsRepository {
   constructor(private db: Database) {}
@@ -10,7 +9,7 @@ export class EnvironmentsRepository {
    * Create a new environment
    */
   async create(data: Omit<NewEnvironment, 'environmentId' | 'createdAt'>): Promise<Environment> {
-    const environmentId = randomUUID();
+    const environmentId = crypto.randomUUID();
 
     const [environment] = await this.db
       .insert(environments)

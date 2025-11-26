@@ -9,6 +9,7 @@ export default function BrandSetup() {
   const [urls, setUrls] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const seedMode = import.meta.env.VITE_USE_SEED === '1';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -22,13 +23,24 @@ export default function BrandSetup() {
         .map(u => u.trim())
         .filter(Boolean);
 
-      const { brand } = await apiClient.createBrand({
-        name: brandName,
-        domain,
-        contentSources,
-      });
+      const create = async () => {
+        const { brand } = await apiClient.createBrand({
+          name: brandName,
+          domain,
+          contentSources,
+        });
+        navigate(`/brand/${brand.brandId}`);
+      };
 
-      navigate(`/brand/${brand.brandId}`);
+      if (seedMode) {
+        // In seed mode, simulate a short analyze delay then go to demo brand
+        setTimeout(() => {
+          navigate('/brand/flowform');
+          setIsAnalyzing(false);
+        }, 500);
+      } else {
+        await create();
+      }
     } catch (err) {
       // In demo/test environments the API server may not be running.
       // If brand creation fails, fall back to the FlowForm demo brand.
@@ -36,7 +48,9 @@ export default function BrandSetup() {
       navigate('/brand/flowform');
       setError(err instanceof Error ? err.message : 'Failed to create brand (using demo fallback)');
     } finally {
-      setIsAnalyzing(false);
+        if (!seedMode) {
+          setIsAnalyzing(false);
+        }
     }
   };
 

@@ -1,10 +1,14 @@
 {
   "brand": {
     "id": "brand_flowform",
-    "name": "FlowForm",
+    "name": "FlowForm Motion Suit",
     "domain": "flowform.io",
     "description": "FlowForm Motion Suit: smart motion suit with ~10 sensors providing real-time form feedback for yoga, light strength, and running—designed for desk-bound knowledge workers who want better movement.",
-    "productImages": [],
+    "productImages": [
+      "https://placehold.co/800x400?text=FlowForm+Motion+Suit+1",
+      "https://placehold.co/800x400?text=FlowForm+Motion+Suit+2",
+      "https://placehold.co/800x400?text=FlowForm+Motion+Suit+3"
+    ],
     "contentSources": [
       "https://flowform.io/landing",
       "https://flowform.io/product"

@@ -1,23 +1,39 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/api-client';
+import flowformSeed from '../data/flowform-seed.json';
 
 export default function HomePage() {
   const [flowFormId, setFlowFormId] = useState<string | null>(null);
+  const [brandName, setBrandName] = useState<string>('Wisdom Pixels');
   const [loading, setLoading] = useState(true);
+  const seedMode = import.meta.env.VITE_USE_SEED === '1';
 
   useEffect(() => {
     const load = async () => {
       try {
+        if (seedMode) {
+          setFlowFormId('flowform');
+          setBrandName(flowformSeed.brand.name || 'FlowForm Motion Suit');
+          return;
+        }
         const { brand } = await apiClient.getBrandBySlug('flowform');
         setFlowFormId(brand.brandId);
+        setBrandName(brand.name);
       } catch {
         try {
           const list = await apiClient.listBrands();
           const flow = list.brands?.find((b) => b.urlSlug === 'flowform');
-          setFlowFormId(flow?.brandId || null);
+          if (flow) {
+            setFlowFormId(flow.brandId);
+            setBrandName(flow.name);
+          } else {
+            setFlowFormId(null);
+          }
         } catch {
-          setFlowFormId(null);
+          // Fall back to bundled seed
+          setFlowFormId('flowform');
+          setBrandName(flowformSeed.brand.name || 'FlowForm Motion Suit');
         }
       } finally {
         setLoading(false);
@@ -43,15 +59,15 @@ export default function HomePage() {
           to={flowFormId ? `/brand/${flowFormId}` : '/setup'}
           style={{
             padding: '0.5rem 1rem',
-            background: flowFormId ? '#007bff' : '#6c757d',
-            color: 'white',
-            textDecoration: 'none',
-            borderRadius: '4px',
-            pointerEvents: loading ? 'none' : 'auto',
-            opacity: loading ? 0.6 : 1
-          }}
+          background: flowFormId ? '#007bff' : '#6c757d',
+          color: 'white',
+          textDecoration: 'none',
+          borderRadius: '4px',
+          pointerEvents: loading ? 'none' : 'auto',
+          opacity: loading ? 0.6 : 1
+        }}
         >
-          {flowFormId ? 'View FlowForm Brand' : loading ? 'Loading FlowForm…' : 'Run Setup'}
+          {flowFormId ? `View ${brandName}` : loading ? 'Loading FlowForm…' : 'Run Setup'}
         </Link>
       </div>
     </div>

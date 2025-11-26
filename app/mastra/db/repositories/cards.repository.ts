@@ -1,7 +1,6 @@
 import { eq, and, sql } from 'drizzle-orm';
-import type { Database } from '../client';
+import type { Database } from '../types';
 import { cards, type Card, type NewCard } from '../schema';
-import { randomUUID } from 'crypto';
 
 export class CardsRepository {
   constructor(private db: Database) {}
@@ -10,7 +9,7 @@ export class CardsRepository {
    * Create a new card
    */
   async create(data: Omit<NewCard, 'cardId' | 'createdAt'>): Promise<Card> {
-    const cardId = randomUUID();
+    const cardId = crypto.randomUUID();
 
     const [card] = await this.db
       .insert(cards)
@@ -161,10 +160,9 @@ export class CardsRepository {
    */
   async getCountByStatus(brandId: string, status: string): Promise<number> {
     const result = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select()
       .from(cards)
       .where(and(eq(cards.brandId, brandId), eq(cards.status, status)));
-
-    return result[0]?.count ?? 0;
+    return result.length;
   }
 }

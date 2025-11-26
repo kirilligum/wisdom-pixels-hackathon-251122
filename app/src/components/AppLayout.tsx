@@ -1,7 +1,17 @@
-import type { CSSProperties } from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { useContext, useState, type CSSProperties } from 'react';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../auth-context';
 
 export default function AppLayout() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const { logout } = useContext(AuthContext);
+  const handleLogout = () => {
+    setMenuOpen(false);
+    logout();
+    navigate('/');
+  };
+
   const headerStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -70,6 +80,8 @@ export default function AppLayout() {
           </button>
           <div
             title="Account"
+            data-testid="account-menu-button"
+            onClick={() => setMenuOpen(!menuOpen)}
             style={{
               ...iconButtonStyle,
               borderRadius: '999px',
@@ -81,9 +93,59 @@ export default function AppLayout() {
               color: 'white',
               fontWeight: 700,
               fontSize: '0.85rem',
+              position: 'relative',
             }}
           >
-            JL
+            WP
+            {menuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '40px',
+                  right: 0,
+                  background: 'white',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                  minWidth: '180px',
+                  zIndex: 20,
+                  padding: '0.35rem 0',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); navigate('/'); }}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '0.6rem 1rem',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '0.95rem',
+                  }}
+                >
+                  Home
+                </button>
+                <button
+                  type="button"
+                  data-testid="logout-button"
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '0.6rem 1rem',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '0.95rem',
+                    color: '#c0392b',
+                  }}
+                >
+                  Log out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>

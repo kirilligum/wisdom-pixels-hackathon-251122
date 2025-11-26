@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { BrandData, Card } from '../types';
 import { apiClient } from '../lib/api-client';
+import flowformSeed from '../data/flowform-seed.json';
 
 export default function CardDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,26 +22,105 @@ export default function CardDetail() {
         setLoading(true);
         setError(null);
 
-        const { card } = await apiClient.getCard(id);
-        const [personasRes, envRes, influencersRes] = await Promise.all([
-          apiClient.getPersonas(card.brandId),
-          apiClient.getEnvironments(card.brandId),
-          apiClient.getInfluencers(),
-        ]);
-        const brandRes = await apiClient.getBrand(card.brandId);
+        let fetchedCard: Card | null = null;
+        let brandData: BrandData | null = null;
 
-        const brandData: BrandData = {
-          brand: brandRes.brand,
-          personas: personasRes.personas,
-          environments: envRes.environments,
-          influencers: influencersRes.influencers,
-          cards: [card],
-        };
+        try {
+          const { card } = await apiClient.getCard(id);
+          const [personasRes, envRes, influencersRes] = await Promise.all([
+            apiClient.getPersonas(card.brandId),
+            apiClient.getEnvironments(card.brandId),
+            apiClient.getInfluencers(),
+          ]);
+          const brandRes = await apiClient.getBrand(card.brandId);
 
-        setCard(card);
+          fetchedCard = card;
+          brandData = {
+            brand: brandRes.brand,
+            personas: personasRes.personas,
+            environments: envRes.environments,
+            influencers: influencersRes.influencers,
+            cards: [card],
+          };
+        } catch (apiErr) {
+          // Fall back to seed data if API not available
+          const seedCard = flowformSeed.cards.find((c: any) => c.id === id);
+          if (seedCard) {
+            fetchedCard = {
+              cardId: seedCard.id,
+              brandId: seedCard.brandId,
+              personaId: seedCard.personaId ?? null,
+              influencerId: seedCard.influencerId,
+              environmentId: seedCard.environmentId ?? null,
+              query: seedCard.query,
+              response: seedCard.response,
+              imageUrl: seedCard.imageUrl,
+              imageBrief: seedCard.imageBrief ?? '',
+              status: (seedCard.status as any) ?? 'draft',
+              viewCount: seedCard.viewCount ?? 0,
+              shareCount: seedCard.shareCount ?? 0,
+            };
+            brandData = {
+              brand: {
+                brandId: flowformSeed.brand.id,
+                name: flowformSeed.brand.name,
+                domain: flowformSeed.brand.domain,
+                description: flowformSeed.brand.description,
+                productImages: flowformSeed.brand.productImages ?? [],
+                contentSources: flowformSeed.brand.contentSources ?? [],
+                urlSlug: 'flowform',
+              },
+              personas: (flowformSeed.personas || []).map((p: any) => ({
+                personaId: p.id,
+                brandId: p.brandId,
+                label: p.label,
+                description: p.description,
+                tags: p.tags ?? [],
+              })),
+              environments: (flowformSeed.environments || []).map((env: any) => ({
+                environmentId: env.id,
+                brandId: env.brandId,
+                label: env.label,
+                description: env.description,
+                tags: env.type ? [env.type] : [],
+              })),
+              influencers: (flowformSeed.influencers || []).map((inf: any) => ({
+                influencerId: inf.id,
+                name: inf.name,
+                bio: `${inf.role}: ${inf.bioShort} (Age ${inf.ageRange})`,
+                domain: inf.role,
+                imageUrl: inf.imageUrl,
+                actionImageUrls: [],
+                enabled: inf.enabled ?? true,
+              })),
+              cards: flowformSeed.cards.map((c: any) => ({
+                cardId: c.id,
+                brandId: c.brandId,
+                personaId: c.personaId ?? null,
+                influencerId: c.influencerId,
+                environmentId: c.environmentId ?? null,
+                query: c.query,
+                response: c.response,
+                imageUrl: c.imageUrl,
+                imageBrief: c.imageBrief ?? '',
+                status: (c.status as any) ?? 'draft',
+                viewCount: c.viewCount ?? 0,
+                shareCount: c.shareCount ?? 0,
+              })),
+            };
+          } else {
+            throw apiErr;
+          }
+        }
+
+        if (!fetchedCard || !brandData) {
+          throw new Error('Card not found');
+        }
+
+        setCard(fetchedCard);
         setData(brandData);
-        setEditedQuery(card.query);
-        setEditedResponse(card.response);
+        setEditedQuery(fetchedCard.query);
+        setEditedResponse(fetchedCard.response);
 
         const viewKey = `card_views_${id}`;
         const currentViews = parseInt(localStorage.getItem(viewKey) || '0', 10);
@@ -422,7 +502,7 @@ export default function CardDetail() {
       {/* Back Link */}
       <div>
         <Link
-          to={`/brand/${data.brand.brandId}/cards`}
+          to={`/brand/${data.brand.urlSlug || data.brand.brandId || 'flowform'}`}
           style={{
             padding: '0.75rem 1.5rem',
             background: '#6c757d',

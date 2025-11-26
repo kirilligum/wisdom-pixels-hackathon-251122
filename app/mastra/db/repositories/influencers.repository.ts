@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm';
-import type { Database } from '../client';
+import type { Database } from '../types';
 import { influencers, type Influencer, type NewInfluencer } from '../schema';
-import { randomUUID } from 'crypto';
 
 export class InfluencersRepository {
   constructor(private db: Database) {}
@@ -10,7 +9,7 @@ export class InfluencersRepository {
    * Create a new influencer
    */
   async create(data: Omit<NewInfluencer, 'influencerId' | 'createdAt'>): Promise<Influencer> {
-    const influencerId = randomUUID();
+    const influencerId = crypto.randomUUID();
 
     const [influencer] = await this.db
       .insert(influencers)

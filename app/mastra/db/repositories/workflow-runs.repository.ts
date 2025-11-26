@@ -1,7 +1,6 @@
 import { eq, and, desc } from 'drizzle-orm';
-import type { Database } from '../client';
+import type { Database } from '../types';
 import { workflowRuns, type WorkflowRun, type NewWorkflowRun } from '../schema';
-import { randomUUID } from 'crypto';
 
 export class WorkflowRunsRepository {
   constructor(private db: Database) {}
@@ -10,7 +9,7 @@ export class WorkflowRunsRepository {
    * Create a new workflow run
    */
   async create(data: Omit<NewWorkflowRun, 'runId' | 'startedAt'>): Promise<WorkflowRun> {
-    const runId = randomUUID();
+    const runId = crypto.randomUUID();
 
     const [run] = await this.db
       .insert(workflowRuns)

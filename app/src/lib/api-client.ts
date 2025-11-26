@@ -1,13 +1,16 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const USE_SEED = import.meta.env.VITE_USE_SEED === '1';
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 async function request<T>(path: string, method: HttpMethod = 'GET', body?: any): Promise<T> {
+  if (USE_SEED) {
+    throw new Error('__SEED_MODE__');
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
 

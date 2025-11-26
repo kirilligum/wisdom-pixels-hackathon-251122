@@ -18,8 +18,9 @@ const MetricPill = ({ label, value }: { label: string; value: string }) => (
 export default function BrandDashboard() {
   const { brandId, tab } = useParams<{ brandId: string; tab?: string }>();
   const navigate = useNavigate();
+  const seedMode = import.meta.env.VITE_USE_SEED === '1';
   const initialTab: TabType =
-    tab === 'influencers' || tab === 'cards' || tab === 'publish' ? (tab as TabType) : 'product';
+    tab === 'influencers' || tab === 'cards' ? (tab as TabType) : 'product';
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [data, setData] = useState<BrandData | null>(null);
   const [influencerStates, setInfluencerStates] = useState<Record<string, { enabled: boolean }>>({});
@@ -220,29 +221,33 @@ export default function BrandDashboard() {
                 description: env.description,
                 tags: env.type ? [env.type] : [],
               })),
-              influencers: (seed.influencers || []).slice(0, 5).map((inf: any) => ({
-                influencerId: inf.id,
-                name: inf.name,
-                bio: `${inf.role}: ${inf.bioShort} (Age ${inf.ageRange})`,
-                domain: inf.role,
-                imageUrl: inf.imageUrl,
-                actionImageUrls: [],
-                enabled: inf.enabled ?? true,
-              })),
-              cards: (seed.cards || []).map((c: any) => ({
-                cardId: c.id,
+            influencers: (seed.influencers || []).slice(0, 5).map((inf: any) => ({
+              influencerId: inf.id,
+              name: inf.name,
+              bio: `${inf.role}: ${inf.bioShort} (Age ${inf.ageRange})`,
+              domain: inf.role,
+              imageUrl: inf.imageUrl && inf.imageUrl.startsWith('http')
+                ? inf.imageUrl
+                : `https://placehold.co/400x200?text=${encodeURIComponent(inf.name)}`,
+              actionImageUrls: [],
+              enabled: inf.enabled ?? true,
+            })),
+            cards: (seed.cards || []).map((c: any) => ({
+              cardId: c.id,
                 brandId: c.brandId,
                 personaId: c.personaId ?? null,
-                influencerId: c.influencerId,
-                environmentId: c.environmentId ?? null,
-                query: c.query,
-                response: c.response,
-                imageUrl: c.imageUrl,
-                imageBrief: c.imageBrief ?? '',
-                status: (c.status as 'draft' | 'published' | string) ?? 'draft',
-                viewCount: c.viewCount ?? 0,
-              })),
-            };
+              influencerId: c.influencerId,
+              environmentId: c.environmentId ?? null,
+              query: c.query,
+              response: c.response,
+              imageUrl: c.imageUrl && c.imageUrl.startsWith('http')
+                ? c.imageUrl
+                : `https://placehold.co/800x600?text=${encodeURIComponent(c.query.substring(0, 30))}`,
+              imageBrief: c.imageBrief ?? '',
+              status: (c.status as 'draft' | 'published' | string) ?? 'draft',
+              viewCount: c.viewCount ?? 0,
+            })),
+          };
 
             setData(brandData);
             setBrandProductImages(brandData.brand.productImages ?? []);
@@ -276,8 +281,7 @@ export default function BrandDashboard() {
   }, [brandId]);
 
   const handleToggleInfluencer = async (influencerId: string, enabled: boolean) => {
-    try {
-      await apiClient.updateInfluencerEnabled(influencerId, enabled);
+    const applyLocal = () => {
       setInfluencerStates(prev => ({
         ...prev,
         [influencerId]: {
@@ -285,6 +289,24 @@ export default function BrandDashboard() {
           enabled
         }
       }));
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              influencers: prev.influencers.map(inf =>
+                inf.influencerId === influencerId ? { ...inf, enabled } : inf,
+              ),
+            }
+          : prev,
+      );
+    };
+
+    applyLocal();
+
+    if (seedMode) return;
+
+    try {
+      await apiClient.updateInfluencerEnabled(influencerId, enabled);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update influencer');
     }
@@ -398,54 +420,6 @@ export default function BrandDashboard() {
     }
   };
 
-  const handleEnableAllInfluencers = async () => {
-    try {
-      if (!data) return;
-      await Promise.all(data.influencers.map(inf => apiClient.updateInfluencerEnabled(inf.influencerId, true)));
-      const nextStates: Record<string, { enabled: boolean }> = {};
-      data.influencers.forEach(inf => {
-        nextStates[inf.influencerId] = { enabled: true };
-      });
-      setInfluencerStates(nextStates);
-      setData({ ...data, influencers: data.influencers.map(inf => ({ ...inf, enabled: true })) });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to enable all influencers');
-    }
-  };
-
-  const handleDisableAllInfluencers = async () => {
-    try {
-      if (!data) return;
-      await Promise.all(data.influencers.map(inf => apiClient.updateInfluencerEnabled(inf.influencerId, false)));
-      const nextStates: Record<string, { enabled: boolean }> = {};
-      data.influencers.forEach(inf => {
-        nextStates[inf.influencerId] = { enabled: false };
-      });
-      setInfluencerStates(nextStates);
-      setData({ ...data, influencers: data.influencers.map(inf => ({ ...inf, enabled: false })) });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to disable all influencers');
-    }
-  };
-
-  const handleDeleteInfluencer = async (influencerId: string) => {
-    try {
-      await apiClient.deleteInfluencer(influencerId);
-      setData(prev => prev ? { ...prev, influencers: prev.influencers.filter(i => i.influencerId !== influencerId) } : prev);
-      setInfluencerStates(prev => {
-        const next = { ...prev };
-        delete next[influencerId];
-        return next;
-      });
-      if (selectedInfluencer?.influencerId === influencerId) {
-        setSelectedInfluencer(null);
-        setGallery(null);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete influencer');
-    }
-  };
-
   const handleSelectInfluencer = async (inf: Influencer) => {
     setSelectedInfluencer(inf);
     setGalleryError(null);
@@ -491,9 +465,9 @@ export default function BrandDashboard() {
 
   const handlePublishSelected = async () => {
     if (selectedCards.size === 0) return;
-    try {
-      const ids = Array.from(selectedCards);
-      await apiClient.publishCards(ids);
+    const ids = Array.from(selectedCards);
+    // Optimistically update local state so offline/seed mode still works
+    const applyLocal = () => {
       const newStatuses = { ...cardStatuses };
       ids.forEach(cardId => {
         newStatuses[cardId] = 'published';
@@ -510,8 +484,16 @@ export default function BrandDashboard() {
           : prev,
       );
       clearCardSelection();
+    };
+
+    try {
+      applyLocal();
+      if (!seedMode) {
+        await apiClient.publishCards(ids);
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to publish cards');
+      // keep local optimistic state even if API fails in demo mode
+      setError(e instanceof Error ? e.message : 'Failed to publish cards (using offline state)');
     }
   };
 
@@ -541,33 +523,6 @@ export default function BrandDashboard() {
       clearCardSelection();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to move cards back to draft');
-    }
-  };
-
-  const handleDeleteSingleCard = async (cardId: string) => {
-    try {
-      await apiClient.deleteCards([cardId]);
-
-      setData(prev =>
-        prev
-          ? {
-              ...prev,
-              cards: prev.cards.filter((c) => c.cardId !== cardId),
-            }
-          : prev,
-      );
-
-      setCardStatuses(prev => {
-        const next = { ...prev };
-        delete next[cardId];
-        return next;
-      });
-
-      if (selectedCards.has(cardId)) {
-        toggleCardSelection(cardId);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete card');
     }
   };
 
@@ -948,18 +903,40 @@ export default function BrandDashboard() {
             />
           </>
         )}
+        {activeTab === 'publish' && (
+          <PublishTab
+            cards={data.cards}
+            cardStatuses={cardStatuses}
+            selectedCards={selectedCards}
+            onToggleSelection={toggleCardSelection}
+            onPublish={handlePublishSelected}
+            onDeleteSelected={handleDeleteSelected}
+            onSelectAll={selectAllCards}
+            onClearSelection={clearCardSelection}
+            searchTerm={cardSearch}
+            onSearchChange={setCardSearch}
+          />
+        )}
+        {activeTab === 'ai' && (
+          <AIContentTab />
+        )}
       </div>
 
       <div style={{ marginTop: '2rem' }}>
-        <Link to="/" style={{
-          padding: '0.5rem 1rem',
-          background: '#6c757d',
-          color: 'white',
-          textDecoration: 'none',
-          borderRadius: '4px'
-        }}>
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          style={{
+            padding: '0.5rem 1rem',
+            background: '#6c757d',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
           Back to Home
-        </Link>
+        </button>
       </div>
 
       {lightboxUrl && (
@@ -995,7 +972,6 @@ function BrandTab({ brand, personas, environments, cards, onImageClick, onUpload
   const imagesToShow = productImages.length > 0 ? productImages : fallbackImages;
 
   const isFlowForm = brand.urlSlug === 'flowform';
-  const [reviewTab, setReviewTab] = useState<'personas' | 'environments'>('personas');
 
   const displayPersonas: Persona[] = isFlowForm
     ? [
@@ -1298,6 +1274,7 @@ export function PublishTab({
         actions={[
           {
             label: `Publish Selected (${selectedCards.size})`,
+            testId: 'publish-button',
             onClick: onPublish,
             disabled: selectedCards.size === 0,
             variant: 'success',
@@ -1342,6 +1319,9 @@ export function PublishTab({
                 <div style={{ fontSize: '0.9rem', color: '#6c757d', marginBottom: '0.25rem' }}>
                   {card.query.substring(0, 80)}...
                 </div>
+                <div data-testid="card-url" style={{ fontSize: '0.85rem', color: '#007bff' }}>
+                  <a href={`/cards/${card.cardId}`}>{`/cards/${card.cardId}`}</a>
+                </div>
               </div>
 
               <span
@@ -1361,6 +1341,77 @@ export function PublishTab({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function AIContentTab() {
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const examplePrompts = [
+    'Write a customer persona for a busy parent who uses FlowForm for 10-minute workouts.',
+    'Describe a training environment for yoga in a small apartment with FlowForm.',
+    'Draft a training card about improving running form with FlowForm Motion Suit.',
+    'Explain how professional athletes can use FlowForm for recovery sessions.',
+  ];
+
+  const handleExample = (text: string) => {
+    setPrompt(text);
+  };
+
+  const handleGenerate = () => {
+    setLoading(true);
+    setTimeout(() => setLoading(false), 800);
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+      <div style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+        <div style={{ marginBottom: '0.5rem', fontWeight: 'bold' }}>Example Prompts</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {examplePrompts.map((p, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleExample(p)}
+              style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #ced4da', cursor: 'pointer' }}
+            >
+              {p.includes('persona') ? 'customer persona' :
+               p.includes('environment') ? 'training environment' :
+               p.includes('athletes') ? 'professional athletes' : 'training card'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid #e9ecef', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <textarea
+          placeholder="Enter a prompt to generate content..."
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          rows={5}
+          style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ced4da', fontSize: '1rem', fontFamily: 'inherit' }}
+        />
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={!prompt || loading}
+            style={{
+              padding: '0.7rem 1.5rem',
+              borderRadius: '6px',
+              border: 'none',
+              background: loading ? '#6c757d' : '#007bff',
+              color: 'white',
+              cursor: (!prompt || loading) ? 'not-allowed' : 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            {loading ? 'Generating...' : 'Generate Content'}
+          </button>
+          <span style={{ color: '#6c757d' }}>Mastra Backend Required — run <code>npm run dev:mastra</code></span>
+        </div>
       </div>
     </div>
   );

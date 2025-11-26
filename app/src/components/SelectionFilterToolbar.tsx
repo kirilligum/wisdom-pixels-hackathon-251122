@@ -5,6 +5,7 @@ export type BulkAction = {
   onClick: () => void;
   disabled?: boolean;
   variant?: 'default' | 'primary' | 'danger' | 'success';
+  testId?: string;
 };
 
 interface SelectionFilterToolbarProps {
@@ -95,6 +96,7 @@ export function SelectionFilterToolbar({
           <button
             key={`${action.label}-${idx}`}
             type="button"
+            data-testid={action.testId}
             onClick={action.onClick}
             disabled={action.disabled}
             style={{
@@ -111,4 +113,3 @@ export function SelectionFilterToolbar({
     </div>
   );
 }
-

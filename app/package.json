@@ -31,6 +31,7 @@
     "@mastra/client-js": "^0.16.14",
     "@mastra/core": "^0.24.5",
     "hono": "^4.10.6",
+    "jose": "^6.1.2",
     "mastra": "^0.18.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

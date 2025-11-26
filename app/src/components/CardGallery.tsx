@@ -209,6 +209,7 @@ export default function CardGallery({
                 const color = isPublished ? '#155724' : '#721c24';
                 return (
                   <div
+                    data-testid="card-status"
                     style={{
                       marginTop: '0.75rem',
                       padding: '0.25rem 0.75rem',
@@ -217,6 +218,7 @@ export default function CardGallery({
                       borderRadius: '12px',
                       fontSize: '0.75rem',
                       display: 'inline-block',
+                      textTransform: 'capitalize',
                     }}
                   >
                     {label}

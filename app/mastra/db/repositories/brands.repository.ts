@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm';
-import type { Database } from '../client';
+import type { Database } from '../types';
 import { brands, type Brand, type NewBrand } from '../schema';
-import { randomUUID } from 'crypto';
 
 export class BrandsRepository {
   constructor(private db: Database) {}
@@ -10,7 +9,7 @@ export class BrandsRepository {
    * Create a new brand with auto-generated ID and timestamps
    */
   async create(data: Omit<NewBrand, 'brandId' | 'createdAt' | 'updatedAt'>): Promise<Brand> {
-    const brandId = randomUUID();
+    const brandId = crypto.randomUUID();
     const now = new Date();
 
     const [brand] = await this.db
