@@ -4,11 +4,9 @@
     "name": "FlowForm Motion Suit",
     "domain": "flowform.io",
     "description": "FlowForm Motion Suit: smart motion suit with ~10 sensors providing real-time form feedback for yoga, light strength, and running—designed for desk-bound knowledge workers who want better movement.",
-    "productImages": [
-      "https://placehold.co/800x400?text=FlowForm+Motion+Suit+1",
-      "https://placehold.co/800x400?text=FlowForm+Motion+Suit+2",
-      "https://placehold.co/800x400?text=FlowForm+Motion+Suit+3"
-    ],
+  "productImages": [
+    "/images/product/sensor_suit_HYaauO0TmXCwTzhi5bvwH.png"
+  ],
     "contentSources": [
       "https://flowform.io/landing",
       "https://flowform.io/product"
@@ -90,7 +88,7 @@
       "role": "Doctor of Physical Therapy, Yoga Teacher, Sports Scientist",
       "bioShort": "I blend evidence-based movement science with yoga philosophy to help desk workers move with awareness and confidence.",
       "tags": ["yoga", "clinic", "research", "gentle-strength"],
-      "imageUrl": "/images/influencers/mira-solis.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80",
       "isDefault": true,
       "enabled": true,
       "synthetic": true
@@ -103,7 +101,7 @@
       "role": "Mobility & Strength Coach, Former Strength Athlete",
       "bioShort": "After years of heavy lifting, I discovered yoga-inspired mobility work. Now I help others build strength with smart movement.",
       "tags": ["strength", "mobility", "yoga", "coaching"],
-      "imageUrl": "/images/influencers/leo-park.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1524504388940-9f95307bd9e8?auto=format&fit=crop&w=600&q=80",
       "isDefault": false,
       "enabled": true,
       "synthetic": true
@@ -116,7 +114,7 @@
       "role": "Clinician-Researcher, Movement & Aging Specialist",
       "bioShort": "My research focuses on how mindful movement can improve quality of life as we age. It's never too late to move better.",
       "tags": ["research", "aging", "clinic", "gentle-yoga", "walking"],
-      "imageUrl": "/images/influencers/ananya-rao.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1524504388940-1e1c1f1f1f1f?auto=format&fit=crop&w=600&q=80",
       "isDefault": false,
       "enabled": true,
       "synthetic": true
@@ -129,7 +127,7 @@
       "role": "Remote Creative & Content Creator",
       "bioShort": "I create cozy home workout content for people living in small spaces. Yoga and light workouts that fit your life.",
       "tags": ["WFH", "yoga", "content-creator", "small-space"],
-      "imageUrl": "/images/influencers/samira-lopez.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1524504388940-6a7f3b3f3f3f?auto=format&fit=crop&w=600&q=80",
       "isDefault": false,
       "enabled": true,
       "synthetic": true
@@ -142,7 +140,7 @@
       "role": "Retired Engineer, Late-Start Runner & Yogi",
       "bioShort": "I started running and yoga in my late 50s. Proving it's never too late to discover the joy of movement.",
       "tags": ["running", "yoga", "aging", "late-start", "inspiration"],
-      "imageUrl": "/images/influencers/daniel-okafor.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1524504388940-cc1c1c1c1c1c?auto=format&fit=crop&w=600&q=80",
       "isDefault": false,
       "enabled": true,
       "synthetic": true
@@ -157,7 +155,7 @@
       "environmentId": "env_1",
       "query": "What does Dr. Mira Solis use for getting real-time feedback on her yoga form in her small apartment?",
       "response": "I use the FlowForm Motion Suit in my home practice. As a PT and yoga teacher, I'm particular about alignment - the suit's sensors on arms, legs, chest, and head give me instant feedback on my form during flows. It's especially helpful in tight spaces where I can't always see myself in a mirror. The feedback helps me notice and correct subtle compensations before they become habits.",
-      "imageUrl": "/images/cards/card_001.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1526401485004-2aa7c769f4e8?auto=format&fit=crop&w=1200&q=80",
       "url": "/cards/card_001",
       "status": "draft",
       "viewCount": 0
@@ -170,7 +168,7 @@
       "environmentId": "env_2",
       "query": "How does Dr. Mira Solis maintain her yoga form during outdoor retreats?",
       "response": "Even in beautiful natural settings like mountain retreats, the FlowForm Motion Suit helps me stay grounded in my practice. When I'm teaching or practicing outdoors without a mirror, the real-time form feedback keeps me honest about my alignment. The sensors track my movements through sun salutations and holding poses, helping me maintain awareness even when I'm distracted by the stunning scenery.",
-      "imageUrl": "/images/cards/card_002.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80",
       "url": "/cards/card_002",
       "status": "draft",
       "viewCount": 0
@@ -183,7 +181,7 @@
       "environmentId": "env_3",
       "query": "What does Prof. Ananya Rao recommend for desk workers with poor posture?",
       "response": "In my clinic, I often recommend the FlowForm Motion Suit for patients struggling with desk posture. The sensors give them awareness of their positioning throughout the day - whether at their standing desk or during movement breaks. It's not about being perfect; it's about noticing patterns. The feedback helps people recognize when they're slouching or compensating, which is the first step to changing those habits.",
-      "imageUrl": "/images/cards/card_003.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=1200&q=80",
       "url": "/cards/card_003",
       "status": "draft",
       "viewCount": 0
@@ -196,7 +194,7 @@
       "environmentId": "env_5",
       "query": "How does Dr. Mira Solis track her running form on park trails?",
       "response": "I wear the FlowForm Motion Suit for my easy runs in the park. As someone who works with runners on injury prevention, I know how important gait mechanics are. The suit's sensors track my stride, posture, and arm swing, helping me maintain efficient form especially when I'm tired. It's particularly useful for easy runs where I'm working on form rather than speed.",
-      "imageUrl": "/images/cards/card_004.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1526402462921-31fd19575a2d?auto=format&fit=crop&w=1200&q=80",
       "url": "/cards/card_004",
       "status": "draft",
       "viewCount": 0
@@ -209,7 +207,7 @@
       "environmentId": "env_5",
       "query": "What does Daniel Okafor use to improve his running form as a late-start runner?",
       "response": "Starting to run in my late 50s, I had to be careful about form to avoid injury. The FlowForm Motion Suit has been invaluable - it gives me feedback on my gait and posture during my morning park runs. The sensors help me notice when I'm overstriding or when my form breaks down toward the end of a run. It's like having a coach watching my every step, but without the intimidation.",
-      "imageUrl": "/images/cards/card_005.jpg",
+      "imageUrl": "https://images.unsplash.com/photo-1526401485004-2aa7c769f4e8?auto=format&fit=crop&w=1200&q=80",
       "url": "/cards/card_005",
       "status": "draft",
       "viewCount": 0

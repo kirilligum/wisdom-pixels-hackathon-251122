@@ -42,6 +42,20 @@ export default function BrandDashboard() {
     totalWithImages: number;
     message?: string;
   } | null>(null);
+  const [newInfluencerDraft, setNewInfluencerDraft] = useState<{ name: string; domain: string; bio: string }>({
+    name: '',
+    domain: '',
+    bio: '',
+  });
+  const [findingInfluencer, setFindingInfluencer] = useState(false);
+  const [findStatus, setFindStatus] = useState<string>('');
+  const [pendingInfluencerId, setPendingInfluencerId] = useState<string | null>(null);
+
+  const normalizeImage = (url: string | undefined | null, fallbackLabel: string, size = '800x600') => {
+    if (url && (/^https?:\/\//i.test(url) || /^data:image\//i.test(url) || url.startsWith('/'))) return url;
+    const label = fallbackLabel ? fallbackLabel.substring(0, 60) : 'Image';
+    return `https://placehold.co/${size}?text=${encodeURIComponent(label)}`;
+  };
 
   // Reusable selection + filter for influencers (by text)
   const {
@@ -175,8 +189,30 @@ export default function BrandDashboard() {
           cards: cardsRes.cards || [],
         };
 
-        setData(brandData);
-        setBrandProductImages(brandData.brand.productImages ?? []);
+        const normalizedCards = (cardsRes.cards || []).map((card) => ({
+          ...card,
+          imageUrl: normalizeImage(card.imageUrl, card.query),
+        }));
+
+        setData({
+          brand: {
+            ...brandRes.brand,
+            productImages: (brandRes.brand.productImages ?? []).map((img) =>
+              normalizeImage(img, brandRes.brand.name, '800x400'),
+            ),
+          },
+          personas: personasRes.personas,
+          environments: environmentsRes.environments,
+          influencers: (influencersRes.influencers || []).map((inf) => ({
+            ...inf,
+            imageUrl: normalizeImage(inf.imageUrl, inf.name, '400x300'),
+            actionImageUrls: (inf.actionImageUrls || []).map((img) => normalizeImage(img, inf.name, '400x300')),
+          })),
+          cards: normalizedCards,
+        });
+        setBrandProductImages(
+          (brandRes.brand.productImages ?? []).map((img) => normalizeImage(img, brandRes.brand.name, '800x400')),
+        );
 
         const initialStates: Record<string, { enabled: boolean }> = {};
         brandData.influencers.forEach((inf) => {
@@ -187,7 +223,7 @@ export default function BrandDashboard() {
         setInfluencerStates(initialStates);
 
         const initialCardStatuses: Record<string, 'draft' | 'ready' | 'published'> = {};
-        brandData.cards.forEach((card) => {
+        normalizedCards.forEach((card) => {
           initialCardStatuses[card.cardId] = (card.status as 'draft' | 'ready' | 'published') ?? 'draft';
         });
         setCardStatuses(initialCardStatuses);
@@ -203,7 +239,9 @@ export default function BrandDashboard() {
                 name: seed.brand.name,
                 domain: seed.brand.domain,
                 description: seed.brand.description,
-                productImages: seed.brand.productImages ?? [],
+                productImages: (seed.brand.productImages ?? []).map((img: string) =>
+                  normalizeImage(img, seed.brand.name, '800x400'),
+                ),
                 contentSources: seed.brand.contentSources ?? [],
                 urlSlug: 'flowform',
               },
@@ -221,33 +259,29 @@ export default function BrandDashboard() {
                 description: env.description,
                 tags: env.type ? [env.type] : [],
               })),
-            influencers: (seed.influencers || []).slice(0, 5).map((inf: any) => ({
-              influencerId: inf.id,
-              name: inf.name,
-              bio: `${inf.role}: ${inf.bioShort} (Age ${inf.ageRange})`,
-              domain: inf.role,
-              imageUrl: inf.imageUrl && inf.imageUrl.startsWith('http')
-                ? inf.imageUrl
-                : `https://placehold.co/400x200?text=${encodeURIComponent(inf.name)}`,
-              actionImageUrls: [],
-              enabled: inf.enabled ?? true,
-            })),
-            cards: (seed.cards || []).map((c: any) => ({
-              cardId: c.id,
+              influencers: (seed.influencers || []).slice(0, 5).map((inf: any) => ({
+                influencerId: inf.id,
+                name: inf.name,
+                bio: `${inf.role}: ${inf.bioShort} (Age ${inf.ageRange})`,
+                domain: inf.role,
+                imageUrl: normalizeImage(inf.imageUrl, inf.name, '400x300'),
+                actionImageUrls: (inf.actionImageUrls || []).map((img: string) => normalizeImage(img, inf.name, '400x300')),
+                enabled: inf.enabled ?? true,
+              })),
+              cards: (seed.cards || []).map((c: any) => ({
+                cardId: c.id,
                 brandId: c.brandId,
                 personaId: c.personaId ?? null,
-              influencerId: c.influencerId,
-              environmentId: c.environmentId ?? null,
-              query: c.query,
-              response: c.response,
-              imageUrl: c.imageUrl && c.imageUrl.startsWith('http')
-                ? c.imageUrl
-                : `https://placehold.co/800x600?text=${encodeURIComponent(c.query.substring(0, 30))}`,
-              imageBrief: c.imageBrief ?? '',
-              status: (c.status as 'draft' | 'published' | string) ?? 'draft',
-              viewCount: c.viewCount ?? 0,
-            })),
-          };
+                influencerId: c.influencerId,
+                environmentId: c.environmentId ?? null,
+                query: c.query,
+                response: c.response,
+                imageUrl: normalizeImage(c.imageUrl, c.query),
+                imageBrief: c.imageBrief ?? '',
+                status: (c.status as 'draft' | 'published' | string) ?? 'draft',
+                viewCount: c.viewCount ?? 0,
+              })),
+            };
 
             setData(brandData);
             setBrandProductImages(brandData.brand.productImages ?? []);
@@ -313,17 +347,70 @@ export default function BrandDashboard() {
   };
 
   const handleMatchInfluencers = async () => {
+    const payload =
+      newInfluencerDraft.name.trim() || newInfluencerDraft.domain.trim() || newInfluencerDraft.bio.trim()
+        ? {
+            name: newInfluencerDraft.name.trim() || undefined,
+            domain: newInfluencerDraft.domain.trim() || undefined,
+            bio: newInfluencerDraft.bio.trim() || undefined,
+          }
+        : undefined;
+
     try {
-      const { influencers } = await apiClient.findNewInfluencers();
-      // rebuild influencer state
-      const nextStates: Record<string, { enabled: boolean }> = {};
-      influencers.forEach(inf => {
-        nextStates[inf.influencerId] = { enabled: inf.enabled };
+      setFindingInfluencer(true);
+      setFindStatus('Submitting find-new request…');
+      // Insert a transient placeholder card while we wait
+      const tempId = `pending-${Date.now()}`;
+      setPendingInfluencerId(tempId);
+      setData(prev => {
+        if (!prev) return prev;
+        const temp: Influencer = {
+          influencerId: tempId,
+          name: payload?.name || 'Generating name…',
+          bio: payload?.bio || 'Generating bio…',
+          domain: payload?.domain || 'Generating domain…',
+          imageUrl: '',
+          actionImageUrls: [],
+          enabled: true,
+        };
+        return { ...prev, influencers: [temp, ...prev.influencers] };
       });
-      setInfluencerStates(nextStates);
-      setData(prev => prev ? { ...prev, influencers } : prev);
+
+      const { influencers, created = [], updated = [] } = await apiClient.findNewInfluencers(payload);
+      setFindStatus('Generating headshot and action images (fal.ai)… this can take up to ~45s');
+      setData(prev => {
+        if (!prev) return prev;
+        const byId = new Map<string, Influencer>();
+        prev.influencers.forEach((inf) => byId.set(inf.influencerId, inf));
+        influencers.forEach((inf) => {
+          const existing = prev.influencers.find((e) => e.name === inf.name || e.influencerId === inf.influencerId);
+          const merged = existing ? { ...existing, ...inf } : inf;
+          byId.set(merged.influencerId, merged);
+        });
+        const mergedList = Array.from(byId.values()).filter(inf => inf.influencerId !== pendingInfluencerId);
+        return { ...prev, influencers: mergedList };
+      });
+      setInfluencerStates((prev) => {
+        const next: Record<string, { enabled: boolean }> = { ...prev };
+        influencers.forEach((inf) => {
+          next[inf.influencerId] = { enabled: inf.enabled };
+        });
+        return next;
+      });
+      if (payload) {
+        setNewInfluencerDraft({ name: '', domain: '', bio: '' });
+      }
+      setFindStatus(`Done: created ${created.length}, upgraded ${updated.length}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to match influencers');
+      setFindStatus('Find-new failed. Please retry.');
+      setData(prev => {
+        if (!prev) return prev;
+        return { ...prev, influencers: prev.influencers.filter(i => i.influencerId !== pendingInfluencerId) };
+      });
+    } finally {
+      setFindingInfluencer(false);
+      setPendingInfluencerId(null);
     }
   };
 
@@ -448,15 +535,18 @@ export default function BrandDashboard() {
   const handleUploadProductImage = async (dataUrl: string) => {
     try {
       if (!data) return;
-      console.log('[upload] starting upload for brand', data.brand.brandId);
+      // Optimistically show the uploaded image
+      setBrandProductImages((prev) => [dataUrl, ...(prev || [])].slice(0, 6));
+      setData((prev) =>
+        prev
+          ? { ...prev, brand: { ...prev.brand, productImages: [dataUrl, ...(prev.brand.productImages ?? [])].slice(0, 6) } }
+          : prev,
+      );
+      // Persist to API/D1
       await apiClient.addProductImage(data.brand.brandId, dataUrl);
-      console.log('[upload] saved to DB, fetching fresh brand');
       const fresh = await apiClient.getBrand(data.brand.brandId);
-      const freshImages = fresh.brand.productImages || [];
-      console.log('[upload] fetched brand with productImages count', freshImages.length);
-      setBrandProductImages(freshImages);
+      setBrandProductImages(fresh.brand.productImages || []);
       setData(prev => prev ? { ...prev, brand: { ...fresh.brand } } : prev);
-      console.log('[upload] state updated with DB images');
     } catch (e) {
       console.error('Upload failed', e);
       setError(e instanceof Error ? e.message : 'Failed to upload product image');
@@ -692,6 +782,61 @@ export default function BrandDashboard() {
         )}
         {activeTab === 'influencers' && (
           <>
+            <div style={{ marginBottom: '1rem', background: 'white', border: '1px solid #e9ecef', borderRadius: '8px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}>
+                <div style={{ flex: '1 1 180px', minWidth: '180px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#495057', marginBottom: '0.25rem' }}>Name (optional)</label>
+                  <input
+                    value={newInfluencerDraft.name}
+                    onChange={(e) => setNewInfluencerDraft(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Nova Quinn"
+                    style={{ width: '100%', padding: '0.65rem 0.75rem', borderRadius: '6px', border: '1px solid #dee2e6', fontSize: '0.95rem' }}
+                  />
+                </div>
+                <div style={{ flex: '1 1 160px', minWidth: '160px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#495057', marginBottom: '0.25rem' }}>Domain</label>
+                  <input
+                    value={newInfluencerDraft.domain}
+                    onChange={(e) => setNewInfluencerDraft(prev => ({ ...prev, domain: e.target.value }))}
+                    placeholder="Strength & Conditioning"
+                    style={{ width: '100%', padding: '0.65rem 0.75rem', borderRadius: '6px', border: '1px solid #dee2e6', fontSize: '0.95rem' }}
+                  />
+                </div>
+                <div style={{ flex: '2 1 240px', minWidth: '220px' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#495057', marginBottom: '0.25rem' }}>Brief / Bio</label>
+                  <input
+                    value={newInfluencerDraft.bio}
+                    onChange={(e) => setNewInfluencerDraft(prev => ({ ...prev, bio: e.target.value }))}
+                    placeholder="Tech-forward creator focused on injury-free training."
+                    style={{ width: '100%', padding: '0.65rem 0.75rem', borderRadius: '6px', border: '1px solid #dee2e6', fontSize: '0.95rem' }}
+                  />
+                </div>
+                <button
+                  onClick={handleMatchInfluencers}
+                  disabled={findingInfluencer}
+                  style={{
+                    background: findingInfluencer ? '#ced4da' : '#0d6efd',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '6px',
+                    fontWeight: 600,
+                    cursor: findingInfluencer ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 6px rgba(13,110,253,0.25)',
+                  }}
+                >
+                  {findingInfluencer ? 'Finding...' : 'Find New'}
+                </button>
+              </div>
+              <p style={{ margin: '0.65rem 0 0 0', color: '#6c757d', fontSize: '0.9rem' }}>
+                Optional: add a name or brief to generate a fresh influencer with fal.ai imagery. Leave blank to auto-generate.
+              </p>
+              {findStatus && (
+                <p style={{ margin: '0.4rem 0 0 0', color: findingInfluencer ? '#0d6efd' : '#495057', fontSize: '0.9rem', fontWeight: 600 }}>
+                  {findingInfluencer ? 'Working: ' : ''}{findStatus}
+                </p>
+              )}
+            </div>
             <SelectionFilterToolbar
               title="Influencer Profiles"
               selectedCount={selectedInfluencerIds.size}
@@ -706,7 +851,7 @@ export default function BrandDashboard() {
                 {
                   label: 'Find New',
                   onClick: handleMatchInfluencers,
-                  disabled: false,
+                  disabled: findingInfluencer,
                   variant: 'primary',
                 },
                 {
@@ -729,8 +874,17 @@ export default function BrandDashboard() {
                 },
               ]}
             />
+            {pendingInfluencerId && (
+              <div style={{ marginBottom: '0.75rem', padding: '0.85rem 1rem', borderRadius: '8px', background: '#fff3cd', border: '1px solid #ffeeba', color: '#856404', fontWeight: 600 }}>
+                Creating influencer… images may take up to ~45s (fal.ai)
+              </div>
+            )}
             <InfluencersTab
-              influencers={filteredInfluencers}
+              influencers={filteredInfluencers.map((inf) =>
+                inf.influencerId === pendingInfluencerId
+                  ? { ...inf, name: inf.name || 'Generating…', bio: inf.bio || 'Generating…', domain: inf.domain || 'Generating…' }
+                  : inf,
+              )}
               influencerStates={influencerStates}
               selectedIds={selectedInfluencerIds}
               onToggleSelected={toggleInfluencerSelection}

@@ -6,6 +6,8 @@ const envSchema = z.object({
   AUTH0_AUDIENCE: z.string().optional(),
   ALLOWED_ORIGINS: z.string().optional(),
   DISABLE_AUTH: z.string().optional(),
+  FAL_KEY: z.string().optional(),
+  FALAI_API_KEY: z.string().optional(),
 });
 
 export function loadApiConfig(env: Record<string, string | undefined>): ApiConfig {
@@ -20,5 +22,6 @@ export function loadApiConfig(env: Record<string, string | undefined>): ApiConfi
     auth0Audience: parsed.AUTH0_AUDIENCE,
     allowedOrigins,
     authDisabled: !authConfigured || parsed.DISABLE_AUTH === '1' || parsed.DISABLE_AUTH === 'true',
+    falKey: parsed.FAL_KEY || parsed.FALAI_API_KEY,
   };
 }

@@ -1,8 +1,6 @@
-export async function generateInfluencerImage(name: string, domain: string): Promise<string> {
-  const falKey = process.env.FAL_KEY || process.env.FALAI_API_KEY;
-  const placeholder = `https://placehold.co/400x400?text=${encodeURIComponent(name)}`;
-
-  if (!falKey) return placeholder;
+export async function generateInfluencerImage(name: string, domain: string, falKey?: string): Promise<string> {
+  falKey = falKey || process.env.FAL_KEY || process.env.FALAI_API_KEY;
+  if (!falKey) throw new Error('FAL key required for headshot');
 
   try {
     console.log(`[image-gen] headshot start for ${name} (${domain})`);
@@ -47,19 +45,20 @@ export async function generateInfluencerImage(name: string, domain: string): Pro
     //   });
     // }
 
-    const url = result?.data?.images?.[0]?.url || placeholder;
+    const url = result?.data?.images?.[0]?.url;
+    if (!url) throw new Error('Headshot URL missing from fal response');
     console.log(`[image-gen] headshot done for ${name}: ${url}`);
     return url;
   } catch (e) {
-    console.error('Image generation failed, using placeholder:', e);
-    return placeholder;
+    console.error('Image generation failed:', e);
+    throw e;
   }
 }
 
-export async function generateActionImages(headshotUrl: string, name: string, domain: string): Promise<string[]> {
-  const falKey = process.env.FAL_KEY || process.env.FALAI_API_KEY;
-  const placeholder = `https://placehold.co/600x800?text=${encodeURIComponent(name)}`;
-  if (!falKey) return [placeholder, placeholder];
+export async function generateActionImages(headshotUrl: string, name: string, domain: string, falKey?: string): Promise<string[]> {
+  falKey = falKey || process.env.FAL_KEY || process.env.FALAI_API_KEY;
+  if (!falKey) throw new Error('FAL key required for action images');
+  if (!headshotUrl) throw new Error('Headshot required for action images');
 
   try {
     console.log(`[image-gen] action start for ${name}`);
@@ -67,22 +66,23 @@ export async function generateActionImages(headshotUrl: string, name: string, do
     fal.config({ credentials: falKey });
 
     const prompts = [
-      `Full-body photo of ${name}, ${domain} influencer, working out in a modern gym, athletic wear, dynamic action, photorealistic, 4k`,
-      `Full-body photo of ${name}, ${domain} influencer, outdoor fitness scene, natural light, running or stretching, photorealistic, 4k`,
+      `Edit to full-body photo of ${name}, ${domain} influencer, working out in a modern gym, athletic wear, dynamic action, photorealistic, 4k`,
+      `Edit to full-body photo of ${name}, ${domain} influencer, outdoor fitness scene, natural light, running or stretching, photorealistic, 4k`,
     ];
 
     const results: string[] = [];
     for (const prompt of prompts) {
       try {
         console.log(`[image-gen] generating action image for ${name}`);
-        // Use Nano Banana Pro for full‑body influencer scenes
-        const resp: any = await fal.subscribe('fal-ai/nano-banana-pro', {
+        // Use Nano Banana Pro edit with the portrait as source
+        const resp: any = await fal.subscribe('fal-ai/nano-banana-pro/edit', {
           input: {
             prompt,
             num_images: 1,
-            aspect_ratio: '3:4',
+            aspect_ratio: 'auto',
             output_format: 'png',
             resolution: '1K',
+            image_urls: [headshotUrl],
           },
           logs: false,
         });
@@ -112,17 +112,17 @@ export async function generateActionImages(headshotUrl: string, name: string, do
         // }
         const url = resp?.data?.images?.[0]?.url;
         console.log(`[image-gen] action image success for ${name}: ${url}`);
-        results.push(url || headshotUrl || placeholder);
+        if (!url) throw new Error('no action url returned');
+        results.push(url);
       } catch (error) {
-        // If all methods fail, use the headshot as fallback to maintain consistency
-        console.warn(`[image-gen] all action image methods failed for ${name}, using headshot:`, error);
-        results.push(headshotUrl || placeholder);
+        console.warn(`[image-gen] action image failed for ${name}`, error);
+        throw error;
       }
     }
 
     return results;
   } catch (e) {
-    console.error('Action image generation failed, using placeholders:', e);
-    return [placeholder, placeholder];
+    console.error('Action image generation failed:', e);
+    throw e;
   }
 }

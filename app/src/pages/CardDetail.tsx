@@ -177,6 +177,9 @@ export default function CardDetail() {
   const influencer = data.influencers.find(i => i.influencerId === card.influencerId);
   const persona = data.personas.find(p => p.personaId === card.personaId);
   const brandProductImage = data.brand.productImages?.[0];
+  const cardImage = card.imageUrl && (/^https?:\/\//i.test(card.imageUrl) || /^data:image\//i.test(card.imageUrl) || card.imageUrl.startsWith('/'))
+    ? card.imageUrl
+    : `https://placehold.co/800x600?text=${encodeURIComponent(card.query.substring(0, 40))}`;
 
   const cardNumberLabel = (() => {
     const parts = card.cardId.split('_');
@@ -224,9 +227,9 @@ export default function CardDetail() {
             background: '#f1f3f5',
           }}
         >
-          {card.imageUrl ? (
+          {cardImage ? (
             <img
-              src={card.imageUrl}
+              src={cardImage}
               alt={card.imageBrief || card.query}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               onError={(e) => {

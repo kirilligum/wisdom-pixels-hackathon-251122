@@ -5,6 +5,8 @@ type Env = {
   ALLOWED_ORIGINS?: string;
   DISABLE_AUTH?: string;
   DISABLE_API?: string;
+  FAL_KEY?: string;
+  FALAI_API_KEY?: string;
 };
 
 export const onRequest = async (context: any) => {
@@ -27,6 +29,8 @@ export const onRequest = async (context: any) => {
       AUTH0_AUDIENCE: context.env.AUTH0_AUDIENCE,
       ALLOWED_ORIGINS: context.env.ALLOWED_ORIGINS,
       DISABLE_AUTH: context.env.DISABLE_AUTH,
+      FAL_KEY: context.env.FAL_KEY as any,
+      FALAI_API_KEY: context.env.FALAI_API_KEY as any,
     });
 
     const db = createD1Db(context.env.DB);

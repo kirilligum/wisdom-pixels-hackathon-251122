@@ -14,6 +14,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:e2e": "playwright test",
+    "db:reset-local": "sqlite3 .wrangler/state/v3/d1/miniflare-D1DatabaseObject/e7352547963de7050bd7d94658afc4fe78b61811b7815da12d90be8e863abf4d.sqlite \"DELETE FROM cards; DELETE FROM influencers;\"",
     "test:m1": "jest tests/unit/db",
     "test:m2": "jest tests/unit/tools tests/integration/tools",
     "test:m3": "jest tests/unit/agents",

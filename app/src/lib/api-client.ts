@@ -109,7 +109,12 @@ export const apiClient = {
   updateInfluencerEnabled: (influencerId: string, enabled: boolean) =>
     request<{ influencer: Influencer }>(`/api/influencers/${influencerId}/enabled`, 'PATCH', { enabled }),
 
-  findNewInfluencers: () => request<{ influencers: Influencer[] }>(`/api/influencers/find-new`, 'POST'),
+  findNewInfluencers: (payload?: { name?: string; bio?: string; domain?: string; brief?: string }) =>
+    request<{ influencers: Influencer[]; created?: Influencer[]; updated?: Influencer[]; skipped?: Influencer[] }>(
+      `/api/influencers/find-new`,
+      'POST',
+      payload || {},
+    ),
   deleteInfluencer: (influencerId: string) => request<{}>(`/api/influencers/${influencerId}`, 'DELETE'),
 
   generateCards: (brandId: string) =>

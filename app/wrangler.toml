@@ -9,6 +9,7 @@ binding = "DB"
 database_name = "wisdom-pixels"
 database_id = "6b05b0e9-7fa8-42ca-a121-72c7b5452821"
 migrations_dir = "mastra/db/migrations"
+local_database_path = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject/e7352547963de7050bd7d94658afc4fe78b61811b7815da12d90be8e863abf4d.sqlite"
 
 # Uncomment and configure if you add KV
 # [[kv_namespaces]]

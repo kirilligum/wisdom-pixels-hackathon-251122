@@ -2,20 +2,23 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { z } from 'zod';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
-import { BrandsRepository } from '../mastra/db/repositories/brands.repository.js';
-import { PersonasRepository } from '../mastra/db/repositories/personas.repository.js';
-import { EnvironmentsRepository } from '../mastra/db/repositories/environments.repository.js';
-import { CardsRepository } from '../mastra/db/repositories/cards.repository.js';
-import { InfluencersRepository } from '../mastra/db/repositories/influencers.repository.js';
-import { generateInfluencerImage, generateActionImages } from '../mastra/db/image-generation.js';
-import type { Influencer } from '../mastra/db/schema.js';
+import { BrandsRepository } from '../mastra/db/repositories/brands.repository';
+import { PersonasRepository } from '../mastra/db/repositories/personas.repository';
+import { EnvironmentsRepository } from '../mastra/db/repositories/environments.repository';
+import { CardsRepository } from '../mastra/db/repositories/cards.repository';
+import { InfluencersRepository } from '../mastra/db/repositories/influencers.repository';
+import { generateInfluencerImage, generateActionImages } from '../mastra/db/image-generation';
+import type { Influencer } from '../mastra/db/schema';
 import type { Database } from '../mastra/db/types';
+import { buildBio, ensureUniqueName, findNewRequestSchema, pickRandomCandidate } from './find-new-support';
+declare const mastra: any;
 
 export type ApiConfig = {
   auth0Domain?: string;
   auth0Audience?: string;
   allowedOrigins: string[];
   authDisabled?: boolean;
+  falKey?: string;
 };
 
 const createBrandSchema = z.object({
@@ -40,11 +43,6 @@ const updateInfluencerEnabledSchema = z.object({
   enabled: z.boolean(),
 });
 
-const placeholderActions = (name: string) => [
-  `https://placehold.co/600x800?text=${encodeURIComponent(name)}+A`,
-  `https://placehold.co/600x800?text=${encodeURIComponent(name)}+B`,
-];
-
 const escapeHtml = (value: string) =>
   value
     .replace(/&/g, '&amp;')
@@ -63,6 +61,12 @@ const defaultAllowedOrigins = ['http://localhost:5173', 'https://wisdom-pixels.p
 
 export function createApiApp({ db, config }: { db: Database; config: ApiConfig }) {
   const app = new Hono<{ Variables: { auth?: JWTPayload } }>();
+
+  // Expose fal key to the node-compatible runtime for generateInfluencerImage
+  if (config.falKey) {
+    process.env.FAL_KEY = config.falKey;
+    process.env.FALAI_API_KEY = config.falKey;
+  }
 
   const allowedOrigins = new Set((config.allowedOrigins?.length ? config.allowedOrigins : defaultAllowedOrigins).map(o => o.trim()).filter(Boolean));
   app.use('*', cors({
@@ -120,24 +124,113 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
     }
 
     if (!actionImages || actionImages.length === 0) {
-      try {
-        actionImages = await generateActionImages(headshot, inf.name, inf.domain);
-      } catch {
-        actionImages = placeholderActions(inf.name);
-      }
+      actionImages = await generateActionImages(headshot, inf.name, inf.domain);
       await influencersRepo.update(inf.influencerId, { imageUrl: headshot, actionImageUrls: actionImages });
     }
 
     return { headshot, actionImages };
   }
 
-  async function createInfluencerWithImages(data: { name: string; bio: string; domain: string }) {
-    const headshot = await generateInfluencerImage(data.name, data.domain);
-    const actionImageUrls = await generateActionImages(headshot, data.name, data.domain);
-    return influencersRepo.create({ ...data, enabled: true, imageUrl: headshot, actionImageUrls });
+  const looksLikePlaceholder = (url?: string) =>
+    !url || url.includes('placehold.co') || url.includes('placeholder') || url.startsWith('data:image/');
+
+  const withTimeout = async <T>(p: Promise<T>, ms: number): Promise<T> =>
+    await Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+
+  async function tryFalImage(name: string, domain: string, fn: () => Promise<string>, timeoutMs: number, retries = 1) {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await withTimeout(fn(), timeoutMs);
+      } catch (err) {
+        lastErr = err;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('timeout')) break;
+      }
+    }
+    throw lastErr || new Error('fal image failed');
   }
 
-  app.post('/api/brands', async (c) => {
+  async function createInfluencerWithImages(
+    data: { name: string; bio: string; domain: string; imageUrl?: string; actionImageUrls?: string[] },
+    options: { preferFal?: boolean; falTimeoutMs?: number } = {},
+  ) {
+    const name = data.name.trim();
+    const domain = (data.domain || 'Fitness & Performance').trim() || 'Fitness & Performance';
+    const bio = (data.bio || `Creator focused on ${domain.toLowerCase()}.`).trim();
+    let headshot = data.imageUrl;
+    let actionImageUrls = data.actionImageUrls;
+    const falKey = config.falKey || process.env.FAL_KEY || process.env.FALAI_API_KEY;
+    const hasFalKey = options.preferFal !== false && Boolean(falKey);
+    if (!hasFalKey) throw new Error('FAL key required for influencer creation');
+    const falTimeoutMs = options.falTimeoutMs ?? 45000;
+
+    headshot = await tryFalImage(name, domain, () => generateInfluencerImage(name, domain, config.falKey), falTimeoutMs, 1);
+
+    actionImageUrls = await tryFalImage(
+      name,
+      domain,
+      async () => {
+        const imgs = await generateActionImages(headshot || '', name, domain, config.falKey);
+        return imgs.join('|||');
+      },
+      falTimeoutMs,
+      0,
+    ).then((joined) => joined.split('|||'));
+
+    if (!headshot || looksLikePlaceholder(headshot)) {
+      throw new Error('Failed to generate headshot');
+    }
+    if (!actionImageUrls || actionImageUrls.length === 0 || actionImageUrls.some(looksLikePlaceholder)) {
+      throw new Error('Failed to generate action images');
+    }
+
+    return influencersRepo.create({ ...data, name, domain, bio, enabled: true, imageUrl: headshot, actionImageUrls });
+  }
+
+  async function upgradePlaceholdersWithFal(influencers: any[]) {
+    const upgraded: any[] = [];
+    const falKey = process.env.FAL_KEY || process.env.FALAI_API_KEY;
+    const hasFalKey = Boolean(falKey);
+    for (const inf of influencers) {
+      const needsHeadshot = looksLikePlaceholder(inf.imageUrl);
+      const needsAction = !inf.actionImageUrls || inf.actionImageUrls.length === 0 || inf.actionImageUrls.some(looksLikePlaceholder);
+      if (!needsHeadshot && !needsAction) continue;
+      let headshot = inf.imageUrl;
+      let actionUrls = inf.actionImageUrls;
+      try {
+        if (!hasFalKey) throw new Error('FAL key required for upgrade');
+        if (needsHeadshot) {
+          headshot = await tryFalImage(inf.name, inf.domain, () => generateInfluencerImage(inf.name, inf.domain, config.falKey), 45000, 1);
+        }
+        if (needsAction) {
+          actionUrls = await tryFalImage(
+            inf.name,
+            inf.domain,
+            async () => {
+              const imgs = await generateActionImages(headshot || '', inf.name, inf.domain, config.falKey);
+              return imgs.join('|||');
+            },
+            45000,
+            0,
+          ).then((joined) => joined.split('|||'));
+        }
+        const updatedRow = await influencersRepo.update(inf.influencerId, {
+          imageUrl: (!headshot || looksLikePlaceholder(headshot)) ? headshot : headshot,
+          actionImageUrls: (!actionUrls || actionUrls.some(looksLikePlaceholder))
+            ? actionUrls
+            : actionUrls,
+        });
+        if (updatedRow) upgraded.push(updatedRow);
+      } catch (err) {
+        console.warn('[find-new] fal generation failed for', inf.name, err);
+        throw err;
+      }
+    }
+    return upgraded;
+  }
+
+app.post('/api/brands', async (c) => {
     return c.json({ error: 'Brand onboarding workflow disabled in edge mode' }, 503);
   });
 
@@ -251,7 +344,33 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
   });
 
   app.post('/api/content/generate', async (c) => {
-    return c.json({ error: 'Content generation disabled in edge mode' }, 503);
+    const { prompt } = await c.req.json();
+    if (!prompt || typeof prompt !== 'string') return c.json({ error: 'Prompt is required' }, 400);
+
+    const falKey = config.falKey || process.env.FAL_KEY || process.env.FALAI_API_KEY;
+    if (!falKey) return c.json({ error: 'FAL key missing' }, 500);
+
+    try {
+      console.log('[content.generate] using fal openrouter with gpt-oss-120b');
+      const { fal } = await import('@fal-ai/client');
+      fal.config({ credentials: falKey });
+      const result: any = await fal.subscribe('openrouter/router', {
+        input: {
+          prompt,
+          model: 'openai/gpt-oss-120b',
+          temperature: 0.7,
+          reasoning: true,
+        },
+        logs: false,
+      });
+      const text = result?.data?.output || result?.data?.choices?.[0]?.message?.content || '';
+      console.log('[content.generate] success bytes', text.length);
+      return c.json({ text });
+    } catch (err) {
+      console.error('[content.generate] fal call failed', err);
+      const msg = (err as any)?.body?.detail || (err as any)?.message || 'Content generation failed';
+      return c.json({ error: msg }, 500);
+    }
   });
 
   app.get('/api/influencers', async () => {
@@ -287,60 +406,47 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
     return c.json({ influencer: updated });
   });
 
-  app.post('/api/influencers/find-new', async () => {
-    const additionsPool = [
-      {
-        name: 'Jordan Lee',
-        bio: 'Strength & conditioning coach focused on wearable-driven training plans.',
-        domain: 'Strength & Conditioning',
-      },
-      {
-        name: 'Priya Nair',
-        bio: 'Fitness content creator specializing in mobility and injury prevention.',
-        domain: 'Mobility & Recovery',
-      },
-      {
-        name: 'Diego Alvarez',
-        bio: 'Endurance athlete coaching runners on recovery and injury-free training.',
-        domain: 'Endurance & Recovery',
-      },
-      {
-        name: 'Mia Patel',
-        bio: 'Yoga and mobility instructor focused on sustainable performance.',
-        domain: 'Yoga & Mobility',
-      },
-      {
-        name: 'Alex Chen',
-        bio: 'CrossFit athlete and nutrition coach specializing in performance optimization.',
-        domain: 'CrossFit & Nutrition',
-      },
-      {
-        name: 'Sarah Williams',
-        bio: 'Physical therapist and movement specialist focused on corrective exercise.',
-        domain: 'Physical Therapy',
-      },
-      {
-        name: 'Marcus Johnson',
-        bio: 'Marathon runner and running coach helping athletes prevent injuries.',
-        domain: 'Running & Endurance',
-      },
-      {
-        name: 'Emma Rodriguez',
-        bio: 'Pilates instructor specializing in core strength and postural alignment.',
-        domain: 'Pilates & Core Training',
-      },
-    ];
-
-    const all = await influencersRepo.findAll();
-    const existingNames = new Set(all.map(i => i.name));
-
-    const newCandidate = additionsPool.find((info) => !existingNames.has(info.name));
-    if (newCandidate) {
-      await createInfluencerWithImages(newCandidate);
+  app.post('/api/influencers/find-new', async (c) => {
+    let requested: { name?: string; bio?: string; domain?: string; brief?: string } = {};
+    try {
+      const body = await c.req.json();
+      const parsed = findNewRequestSchema.safeParse(body || {});
+      requested = parsed.success ? parsed.data : {};
+    } catch {
+      requested = {};
     }
 
+    const all = await influencersRepo.findAll();
+    const existingNames = new Set(all.map(i => i.name.toLowerCase()));
+
+    const created: any[] = [];
+    const updated: any[] = [];
+    const skipped: any[] = [];
+
+    // If a custom influencer is requested, add it even if existing list is empty
+    if (requested.name || requested.bio || requested.domain) {
+      const candidateDomain = (requested.domain || 'Fitness & Performance').trim();
+      const candidateName = ensureUniqueName(requested.name || 'New Creator', existingNames);
+      const candidateBio = (requested.bio || buildBio(candidateName, candidateDomain, requested.brief)).trim();
+      const createdRow = await createInfluencerWithImages(
+        { name: candidateName, bio: candidateBio, domain: candidateDomain },
+        { preferFal: true, falTimeoutMs: 20000 },
+      );
+      created.push(createdRow);
+    } else {
+      // No payload: create exactly one new random influencer aligned to FlowForm use-cases
+      const candidate = pickRandomCandidate(existingNames);
+      const createdRow = await createInfluencerWithImages(candidate, { preferFal: true });
+      created.push(createdRow);
+    }
+
+    // For any remaining placeholders (no static assets), try fal.ai generation on demand
+    const allAfter = await influencersRepo.findAll();
+    const falUpgraded = await upgradePlaceholdersWithFal(allAfter);
+    updated.push(...falUpgraded);
+
     const finalList = await influencersRepo.findEnabled();
-    return new Response(JSON.stringify({ influencers: finalList }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ influencers: finalList, created, updated, skipped }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
 
   app.get('/dataset/:brandId', async (c) => {
@@ -570,7 +676,7 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
   app.get('/api/dataset/:brandId', async (c) => {
     const url = new URL(c.req.url);
     url.pathname = url.pathname.replace(/^\/api\/dataset\//, '/dataset/');
-    return app.fetch(url.toString(), c.env as any, c.env?.executionCtx);
+    return app.request(url.toString());
   });
 
   app.get('/api/health', () => new Response(JSON.stringify({ status: 'ok', timestamp: Date.now() }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
