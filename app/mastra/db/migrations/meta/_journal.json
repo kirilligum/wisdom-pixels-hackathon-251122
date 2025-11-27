@@ -36,6 +36,20 @@
       "when": 1763982000000,
       "tag": "0004_brand_product_images",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "11",
+      "when": 1763985600000,
+      "tag": "0005_add_influencer_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "12",
+      "when": 1763989200000,
+      "tag": "0006_add_influencer_error",
+      "breakpoints": true
     }
   ]
 }

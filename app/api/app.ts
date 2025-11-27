@@ -120,15 +120,41 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
     let actionImages = inf.actionImageUrls ?? [];
 
     if (!headshot) {
-      headshot = await generateInfluencerImage(inf.name, inf.domain);
+      headshot = await generateInfluencerImage(inf.name, inf.domain, config.falKey);
     }
 
     if (!actionImages || actionImages.length === 0) {
-      actionImages = await generateActionImages(headshot, inf.name, inf.domain);
-      await influencersRepo.update(inf.influencerId, { imageUrl: headshot, actionImageUrls: actionImages });
+      actionImages = await generateActionImages(headshot, inf.name, inf.domain, config.falKey);
+      await influencersRepo.update(inf.influencerId, {
+        imageUrl: headshot,
+        actionImageUrls: actionImages,
+        status: 'ready',
+        errorMessage: null,
+      });
+    } else {
+      await influencersRepo.update(inf.influencerId, {
+        imageUrl: headshot,
+        actionImageUrls: actionImages,
+        status: 'ready',
+        errorMessage: null,
+      });
     }
 
     return { headshot, actionImages };
+  }
+
+  async function normalizeStatus(list: Influencer[]) {
+    const normalized: Influencer[] = [];
+    for (const inf of list) {
+      const shouldBeReady = inf.imageUrl && inf.actionImageUrls && inf.actionImageUrls.length > 0;
+      if (shouldBeReady && (inf as any).status !== 'ready') {
+        const updated = await influencersRepo.update(inf.influencerId, { status: 'ready', errorMessage: null });
+        normalized.push(updated || inf);
+      } else {
+        normalized.push(inf);
+      }
+    }
+    return normalized;
   }
 
   const looksLikePlaceholder = (url?: string) =>
@@ -188,6 +214,19 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
     return influencersRepo.create({ ...data, name, domain, bio, enabled: true, imageUrl: headshot, actionImageUrls });
   }
 
+  async function generateAndPersistInfluencer(influencer: Influencer) {
+    try {
+      await influencersRepo.update(influencer.influencerId, { status: 'pending', errorMessage: null });
+      const headshot = await generateInfluencerImage(influencer.name, influencer.domain, config.falKey);
+      await influencersRepo.update(influencer.influencerId, { imageUrl: headshot, status: 'headshot_ready' });
+      const actionImages = await generateActionImages(headshot, influencer.name, influencer.domain, config.falKey);
+      await influencersRepo.update(influencer.influencerId, { actionImageUrls: actionImages, status: 'ready', errorMessage: null });
+    } catch (err) {
+      await influencersRepo.update(influencer.influencerId, { status: 'failed', errorMessage: err instanceof Error ? err.message : String(err) });
+      throw err;
+    }
+  }
+
   async function upgradePlaceholdersWithFal(influencers: any[]) {
     const upgraded: any[] = [];
     const falKey = process.env.FAL_KEY || process.env.FALAI_API_KEY;
@@ -216,14 +255,15 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
           ).then((joined) => joined.split('|||'));
         }
         const updatedRow = await influencersRepo.update(inf.influencerId, {
-          imageUrl: (!headshot || looksLikePlaceholder(headshot)) ? headshot : headshot,
-          actionImageUrls: (!actionUrls || actionUrls.some(looksLikePlaceholder))
-            ? actionUrls
-            : actionUrls,
+          imageUrl: headshot,
+          actionImageUrls: actionUrls,
+          status: 'ready',
+          errorMessage: null,
         });
         if (updatedRow) upgraded.push(updatedRow);
       } catch (err) {
         console.warn('[find-new] fal generation failed for', inf.name, err);
+        await influencersRepo.update(inf.influencerId, { status: 'failed', errorMessage: err instanceof Error ? err.message : String(err) });
         throw err;
       }
     }
@@ -375,7 +415,8 @@ app.post('/api/brands', async (c) => {
 
   app.get('/api/influencers', async () => {
     const influencers = await influencersRepo.findAll();
-    return new Response(JSON.stringify({ influencers }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const normalized = await normalizeStatus(influencers);
+    return new Response(JSON.stringify({ influencers: normalized }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
 
   app.get('/api/influencers/:influencerId/gallery', async (c) => {
@@ -428,22 +469,32 @@ app.post('/api/brands', async (c) => {
       const candidateDomain = (requested.domain || 'Fitness & Performance').trim();
       const candidateName = ensureUniqueName(requested.name || 'New Creator', existingNames);
       const candidateBio = (requested.bio || buildBio(candidateName, candidateDomain, requested.brief)).trim();
-      const createdRow = await createInfluencerWithImages(
-        { name: candidateName, bio: candidateBio, domain: candidateDomain },
-        { preferFal: true, falTimeoutMs: 20000 },
-      );
+      const createdRow = await influencersRepo.create({
+        name: candidateName,
+        bio: candidateBio,
+        domain: candidateDomain,
+        imageUrl: '',
+        actionImageUrls: [],
+        enabled: true,
+        status: 'pending',
+        errorMessage: null,
+      } as any);
       created.push(createdRow);
+      void generateAndPersistInfluencer(createdRow);
     } else {
       // No payload: create exactly one new random influencer aligned to FlowForm use-cases
       const candidate = pickRandomCandidate(existingNames);
-      const createdRow = await createInfluencerWithImages(candidate, { preferFal: true });
+      const createdRow = await influencersRepo.create({
+        ...candidate,
+        imageUrl: '',
+        actionImageUrls: [],
+        enabled: true,
+        status: 'pending',
+        errorMessage: null,
+      } as any);
       created.push(createdRow);
+      void generateAndPersistInfluencer(createdRow);
     }
-
-    // For any remaining placeholders (no static assets), try fal.ai generation on demand
-    const allAfter = await influencersRepo.findAll();
-    const falUpgraded = await upgradePlaceholdersWithFal(allAfter);
-    updated.push(...falUpgraded);
 
     const finalList = await influencersRepo.findEnabled();
     return new Response(JSON.stringify({ influencers: finalList, created, updated, skipped }), { status: 200, headers: { 'Content-Type': 'application/json' } });

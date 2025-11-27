@@ -17,6 +17,8 @@ export class InfluencersRepository {
         ...data,
         influencerId,
         enabled: data.enabled ?? true,
+        status: (data as any).status ?? 'pending',
+        errorMessage: (data as any).errorMessage ?? null,
         createdAt: new Date(),
       })
       .returning();

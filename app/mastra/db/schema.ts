@@ -55,6 +55,8 @@ export const influencers = sqliteTable('influencers', {
   imageUrl: text('image_url').notNull(),
   actionImageUrls: text('action_image_urls', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  status: text('status').notNull().default('pending'), // pending, headshot_ready, ready, failed
+  errorMessage: text('error_message'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 

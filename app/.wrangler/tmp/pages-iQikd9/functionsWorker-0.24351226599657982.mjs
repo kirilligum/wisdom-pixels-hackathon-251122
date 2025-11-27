@@ -25309,6 +25309,9 @@ var init_schema = __esm({
       imageUrl: text("image_url").notNull(),
       actionImageUrls: text("action_image_urls", { mode: "json" }).$type().notNull().default(sql`'[]'`),
       enabled: integer2("enabled", { mode: "boolean" }).notNull().default(true),
+      status: text("status").notNull().default("pending"),
+      // pending, headshot_ready, ready, failed
+      errorMessage: text("error_message"),
       createdAt: integer2("created_at", { mode: "timestamp" }).notNull().default(sql`(unixepoch())`)
     });
     cards = sqliteTable("cards", {
@@ -25718,6 +25721,8 @@ var init_influencers_repository = __esm({
           ...data,
           influencerId,
           enabled: data.enabled ?? true,
+          status: data.status ?? "pending",
+          errorMessage: data.errorMessage ?? null,
           createdAt: /* @__PURE__ */ new Date()
         }).returning();
         return influencer;
@@ -30101,15 +30106,41 @@ function createApiApp({ db, config: config3 }) {
     let headshot = inf.imageUrl;
     let actionImages = inf.actionImageUrls ?? [];
     if (!headshot) {
-      headshot = await generateInfluencerImage(inf.name, inf.domain);
+      headshot = await generateInfluencerImage(inf.name, inf.domain, config3.falKey);
     }
     if (!actionImages || actionImages.length === 0) {
-      actionImages = await generateActionImages(headshot, inf.name, inf.domain);
-      await influencersRepo.update(inf.influencerId, { imageUrl: headshot, actionImageUrls: actionImages });
+      actionImages = await generateActionImages(headshot, inf.name, inf.domain, config3.falKey);
+      await influencersRepo.update(inf.influencerId, {
+        imageUrl: headshot,
+        actionImageUrls: actionImages,
+        status: "ready",
+        errorMessage: null
+      });
+    } else {
+      await influencersRepo.update(inf.influencerId, {
+        imageUrl: headshot,
+        actionImageUrls: actionImages,
+        status: "ready",
+        errorMessage: null
+      });
     }
     return { headshot, actionImages };
   }
   __name(ensureInfluencerGallery, "ensureInfluencerGallery");
+  async function normalizeStatus(list) {
+    const normalized = [];
+    for (const inf of list) {
+      const shouldBeReady = inf.imageUrl && inf.actionImageUrls && inf.actionImageUrls.length > 0;
+      if (shouldBeReady && inf.status !== "ready") {
+        const updated = await influencersRepo.update(inf.influencerId, { status: "ready", errorMessage: null });
+        normalized.push(updated || inf);
+      } else {
+        normalized.push(inf);
+      }
+    }
+    return normalized;
+  }
+  __name(normalizeStatus, "normalizeStatus");
   const looksLikePlaceholder = /* @__PURE__ */ __name((url2) => !url2 || url2.includes("placehold.co") || url2.includes("placeholder") || url2.startsWith("data:image/"), "looksLikePlaceholder");
   const withTimeout = /* @__PURE__ */ __name(async (p, ms) => await Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]), "withTimeout");
   async function tryFalImage(name, domain3, fn, timeoutMs, retries = 1) {
@@ -30156,6 +30187,19 @@ function createApiApp({ db, config: config3 }) {
     return influencersRepo.create({ ...data, name, domain: domain3, bio, enabled: true, imageUrl: headshot, actionImageUrls });
   }
   __name(createInfluencerWithImages, "createInfluencerWithImages");
+  async function generateAndPersistInfluencer(influencer) {
+    try {
+      await influencersRepo.update(influencer.influencerId, { status: "pending", errorMessage: null });
+      const headshot = await generateInfluencerImage(influencer.name, influencer.domain, config3.falKey);
+      await influencersRepo.update(influencer.influencerId, { imageUrl: headshot, status: "headshot_ready" });
+      const actionImages = await generateActionImages(headshot, influencer.name, influencer.domain, config3.falKey);
+      await influencersRepo.update(influencer.influencerId, { actionImageUrls: actionImages, status: "ready", errorMessage: null });
+    } catch (err) {
+      await influencersRepo.update(influencer.influencerId, { status: "failed", errorMessage: err instanceof Error ? err.message : String(err) });
+      throw err;
+    }
+  }
+  __name(generateAndPersistInfluencer, "generateAndPersistInfluencer");
   async function upgradePlaceholdersWithFal(influencers2) {
     const upgraded = [];
     const falKey = process.env.FAL_KEY || process.env.FALAI_API_KEY;
@@ -30184,12 +30228,15 @@ function createApiApp({ db, config: config3 }) {
           ).then((joined) => joined.split("|||"));
         }
         const updatedRow = await influencersRepo.update(inf.influencerId, {
-          imageUrl: !headshot || looksLikePlaceholder(headshot) ? headshot : headshot,
-          actionImageUrls: !actionUrls || actionUrls.some(looksLikePlaceholder) ? actionUrls : actionUrls
+          imageUrl: headshot,
+          actionImageUrls: actionUrls,
+          status: "ready",
+          errorMessage: null
         });
         if (updatedRow) upgraded.push(updatedRow);
       } catch (err) {
         console.warn("[find-new] fal generation failed for", inf.name, err);
+        await influencersRepo.update(inf.influencerId, { status: "failed", errorMessage: err instanceof Error ? err.message : String(err) });
         throw err;
       }
     }
@@ -30318,7 +30365,8 @@ function createApiApp({ db, config: config3 }) {
   });
   app.get("/api/influencers", async () => {
     const influencers2 = await influencersRepo.findAll();
-    return new Response(JSON.stringify({ influencers: influencers2 }), { status: 200, headers: { "Content-Type": "application/json" } });
+    const normalized = await normalizeStatus(influencers2);
+    return new Response(JSON.stringify({ influencers: normalized }), { status: 200, headers: { "Content-Type": "application/json" } });
   });
   app.get("/api/influencers/:influencerId/gallery", async (c) => {
     const influencerId = c.req.param("influencerId");
@@ -30361,19 +30409,31 @@ function createApiApp({ db, config: config3 }) {
       const candidateDomain = (requested.domain || "Fitness & Performance").trim();
       const candidateName = ensureUniqueName(requested.name || "New Creator", existingNames);
       const candidateBio = (requested.bio || buildBio(candidateName, candidateDomain, requested.brief)).trim();
-      const createdRow = await createInfluencerWithImages(
-        { name: candidateName, bio: candidateBio, domain: candidateDomain },
-        { preferFal: true, falTimeoutMs: 2e4 }
-      );
+      const createdRow = await influencersRepo.create({
+        name: candidateName,
+        bio: candidateBio,
+        domain: candidateDomain,
+        imageUrl: "",
+        actionImageUrls: [],
+        enabled: true,
+        status: "pending",
+        errorMessage: null
+      });
       created.push(createdRow);
+      void generateAndPersistInfluencer(createdRow);
     } else {
       const candidate = pickRandomCandidate(existingNames);
-      const createdRow = await createInfluencerWithImages(candidate, { preferFal: true });
+      const createdRow = await influencersRepo.create({
+        ...candidate,
+        imageUrl: "",
+        actionImageUrls: [],
+        enabled: true,
+        status: "pending",
+        errorMessage: null
+      });
       created.push(createdRow);
+      void generateAndPersistInfluencer(createdRow);
     }
-    const allAfter = await influencersRepo.findAll();
-    const falUpgraded = await upgradePlaceholdersWithFal(allAfter);
-    updated.push(...falUpgraded);
     const finalList = await influencersRepo.findEnabled();
     return new Response(JSON.stringify({ influencers: finalList, created, updated, skipped }), { status: 200, headers: { "Content-Type": "application/json" } });
   });
@@ -31030,13 +31090,13 @@ var init_functionsRoutes_0_4889189663689424 = __esm({
   }
 });
 
-// ../.wrangler/tmp/bundle-PXeTz8/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-bw6xt7/middleware-loader.entry.ts
 init_functionsRoutes_0_4889189663689424();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_console();
 init_performance2();
 
-// ../.wrangler/tmp/bundle-PXeTz8/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-bw6xt7/middleware-insertion-facade.js
 init_functionsRoutes_0_4889189663689424();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_console();
@@ -31547,7 +31607,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env2, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-PXeTz8/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-bw6xt7/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -31583,7 +31643,7 @@ function __facade_invoke__(request, env2, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-PXeTz8/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-bw6xt7/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

@@ -49,7 +49,6 @@ export default function BrandDashboard() {
   });
   const [findingInfluencer, setFindingInfluencer] = useState(false);
   const [findStatus, setFindStatus] = useState<string>('');
-  const [pendingInfluencerId, setPendingInfluencerId] = useState<string | null>(null);
 
   const normalizeImage = (url: string | undefined | null, fallbackLabel: string, size = '800x600') => {
     if (url && (/^https?:\/\//i.test(url) || /^data:image\//i.test(url) || url.startsWith('/'))) return url;
@@ -314,6 +313,21 @@ export default function BrandDashboard() {
     load();
   }, [brandId]);
 
+  // Poll for pending influencers until all are ready/failed
+  useEffect(() => {
+    const hasPending = data?.influencers?.some((inf) => (inf as any).status && (inf as any).status !== 'ready' && (inf as any).status !== 'failed');
+    if (!hasPending) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await apiClient.getInfluencers();
+        setData(prev => prev ? { ...prev, influencers: res.influencers } : prev);
+      } catch (err) {
+        console.error('Polling influencers failed', err);
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [data?.influencers]);
+
   const handleToggleInfluencer = async (influencerId: string, enabled: boolean) => {
     const applyLocal = () => {
       setInfluencerStates(prev => ({
@@ -359,23 +373,6 @@ export default function BrandDashboard() {
     try {
       setFindingInfluencer(true);
       setFindStatus('Submitting find-new request…');
-      // Insert a transient placeholder card while we wait
-      const tempId = `pending-${Date.now()}`;
-      setPendingInfluencerId(tempId);
-      setData(prev => {
-        if (!prev) return prev;
-        const temp: Influencer = {
-          influencerId: tempId,
-          name: payload?.name || 'Generating name…',
-          bio: payload?.bio || 'Generating bio…',
-          domain: payload?.domain || 'Generating domain…',
-          imageUrl: '',
-          actionImageUrls: [],
-          enabled: true,
-        };
-        return { ...prev, influencers: [temp, ...prev.influencers] };
-      });
-
       const { influencers, created = [], updated = [] } = await apiClient.findNewInfluencers(payload);
       setFindStatus('Generating headshot and action images (fal.ai)… this can take up to ~45s');
       setData(prev => {
@@ -387,7 +384,7 @@ export default function BrandDashboard() {
           const merged = existing ? { ...existing, ...inf } : inf;
           byId.set(merged.influencerId, merged);
         });
-        const mergedList = Array.from(byId.values()).filter(inf => inf.influencerId !== pendingInfluencerId);
+        const mergedList = Array.from(byId.values());
         return { ...prev, influencers: mergedList };
       });
       setInfluencerStates((prev) => {
@@ -404,13 +401,8 @@ export default function BrandDashboard() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to match influencers');
       setFindStatus('Find-new failed. Please retry.');
-      setData(prev => {
-        if (!prev) return prev;
-        return { ...prev, influencers: prev.influencers.filter(i => i.influencerId !== pendingInfluencerId) };
-      });
     } finally {
       setFindingInfluencer(false);
-      setPendingInfluencerId(null);
     }
   };
 
@@ -874,17 +866,8 @@ export default function BrandDashboard() {
                 },
               ]}
             />
-            {pendingInfluencerId && (
-              <div style={{ marginBottom: '0.75rem', padding: '0.85rem 1rem', borderRadius: '8px', background: '#fff3cd', border: '1px solid #ffeeba', color: '#856404', fontWeight: 600 }}>
-                Creating influencer… images may take up to ~45s (fal.ai)
-              </div>
-            )}
             <InfluencersTab
-              influencers={filteredInfluencers.map((inf) =>
-                inf.influencerId === pendingInfluencerId
-                  ? { ...inf, name: inf.name || 'Generating…', bio: inf.bio || 'Generating…', domain: inf.domain || 'Generating…' }
-                  : inf,
-              )}
+              influencers={filteredInfluencers}
               influencerStates={influencerStates}
               selectedIds={selectedInfluencerIds}
               onToggleSelected={toggleInfluencerSelection}
@@ -1277,6 +1260,10 @@ function InfluencersTab({
         {influencers.map((influencer) => {
           const state = influencerStates[influencer.influencerId] || { enabled: false };
           const isSelected = selectedIds.has(influencer.influencerId);
+          const status = (influencer as any).status || 'ready';
+          const isPending = status !== 'ready';
+          const isFailed = status === 'failed';
+          const cardImage = influencer.imageUrl || (influencer.actionImageUrls && influencer.actionImageUrls[0]) || '';
           return (
             <div
               key={influencer.influencerId}
@@ -1284,29 +1271,42 @@ function InfluencersTab({
               onClick={() => onSelectOne(influencer)}
               style={{
                 padding: '1.5rem',
-                background: 'white',
+                background: isPending ? '#f8f9fa' : 'white',
                 borderRadius: '8px',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 opacity: state.enabled ? 1 : 0.6,
                 cursor: 'pointer'
               }}
             >
-              <img
-                src={influencer.imageUrl || `https://placehold.co/400x200?text=${encodeURIComponent(influencer.name)}`}
-                alt={influencer.name}
-                style={{
+              {(!isPending && cardImage) ? (
+                <img
+                  src={cardImage}
+                  alt={influencer.name}
+                  style={{
+                    width: '100%',
+                    height: '180px',
+                    objectFit: 'cover',
+                    borderRadius: '6px',
+                    marginBottom: '0.75rem',
+                    border: '1px solid #e9ecef',
+                    cursor: 'zoom-in'
+                  }}
+                  onError={(e) => {
+                    e.currentTarget.src = '';
+                  }}
+                />
+              ) : (
+                <div style={{
                   width: '100%',
                   height: '180px',
-                  objectFit: 'cover',
                   borderRadius: '6px',
                   marginBottom: '0.75rem',
-                  border: '1px solid #e9ecef',
-                  cursor: 'zoom-in'
-                }}
-                onError={(e) => {
-                  e.currentTarget.src = `https://placehold.co/400x200?text=${encodeURIComponent(influencer.name)}`;
-                }}
-              />
+                  border: '1px dashed #ced4da',
+                  background: 'linear-gradient(90deg, #f1f3f5 25%, #e9ecef 50%, #f1f3f5 75%)',
+                  backgroundSize: '200% 100%',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }} aria-label="Generating influencer images" />
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
                   <input
@@ -1323,12 +1323,14 @@ function InfluencersTab({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <h3 style={{ margin: 0, color: '#6f42c1' }}>{influencer.name}</h3>
+                {isPending && <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>Processing…</span>}
+                {isFailed && <span style={{ fontSize: '0.8rem', color: '#c0392b' }}>Failed</span>}
               </div>
               <p style={{ marginBottom: '0.5rem', color: '#6c757d', fontSize: '0.9rem' }}>
                 Domain: {influencer.domain}
               </p>
               <p style={{ marginBottom: '1rem', color: '#495057', fontSize: '0.95rem' }}>
-                {influencer.bio}
+                {isFailed ? ((influencer as any).errorMessage || 'Image generation failed') : influencer.bio}
               </p>
 
               {/* Controls */}

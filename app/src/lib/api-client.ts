@@ -57,6 +57,8 @@ export type Influencer = {
   imageUrl: string;
   actionImageUrls?: string[];
   enabled: boolean;
+  status?: string;
+  errorMessage?: string | null;
 };
 
 export type Card = {
