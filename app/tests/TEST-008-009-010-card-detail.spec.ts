@@ -9,8 +9,8 @@ import { test, expect } from '@playwright/test';
 test.describe('Card Detail Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/brand/flowform');
-    // Navigate to Cards tab
-    const cardsTab = page.locator('button:has-text("Cards")');
+    // Navigate to Dataset tab
+    const cardsTab = page.locator('button:has-text("Dataset")');
     await cardsTab.click();
     await page.waitForTimeout(500);
   });
@@ -43,8 +43,8 @@ test.describe('Card Detail Tests', () => {
     await page.goBack();
     await page.waitForURL(/\/brand\/flowform/, { timeout: 3000 });
 
-    // Wait for Cards tab to be active again
-    const cardsTab = page.locator('button:has-text("Cards")');
+    // Wait for Dataset tab to be active again
+    const cardsTab = page.locator('button:has-text("Dataset")');
     await cardsTab.click();
     await page.waitForTimeout(500);
 

@@ -10,7 +10,7 @@ test.describe('Card Gallery Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/brand/flowform');
     // Navigate to gallery/cards tab
-    const cardsTab = page.locator('button:has-text("Cards")');
+    const cardsTab = page.locator('button:has-text("Dataset")');
     await cardsTab.click();
     await page.waitForTimeout(500);
   });
@@ -63,7 +63,7 @@ test.describe('Card Gallery Tests', () => {
 
     await page.goto('/brand/flowform');
 
-    const cardsTab = page.locator('button:has-text("Cards")');
+    const cardsTab = page.locator('button:has-text("Dataset")');
     await cardsTab.click();
 
     // Wait for cards to be visible

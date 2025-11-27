@@ -126,3 +126,39 @@ export async function generateActionImages(headshotUrl: string, name: string, do
     throw e;
   }
 }
+
+export async function generateCardImage(params: {
+  influencerName: string;
+  influencerDomain: string;
+  brandName: string;
+  brandDescription?: string;
+  query: string;
+  falKey?: string;
+}): Promise<string> {
+  const falKey = params.falKey || process.env.FAL_KEY || process.env.FALAI_API_KEY;
+  if (!falKey) throw new Error('FAL key required for card image');
+  const { influencerName, influencerDomain, brandName, brandDescription, query } = params;
+
+  const prompt = `Photorealistic cinematic action shot of ${influencerName}, a ${influencerDomain} creator, using the ${brandName} wearable motion suit in the environment implied by: "${query}". Show the product clearly (sensors, suit detail) and the environment context. Include cues from: ${brandDescription || 'motion capture suit for training and recovery'}. Dynamic lighting, sharp detail, 4k.`;
+
+  try {
+    const { fal } = await import('@fal-ai/client');
+    fal.config({ credentials: falKey });
+    const result: any = await fal.subscribe('fal-ai/nano-banana-pro', {
+      input: {
+        prompt,
+        num_images: 1,
+        aspect_ratio: '16:9',
+        output_format: 'png',
+        resolution: '1K',
+      },
+      logs: false,
+    });
+    const url = result?.data?.images?.[0]?.url;
+    if (!url) throw new Error('Card image URL missing from fal response');
+    return url;
+  } catch (err) {
+    console.error('[card-image] generation failed', err);
+    throw err;
+  }
+}

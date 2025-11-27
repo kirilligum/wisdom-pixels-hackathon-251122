@@ -79,6 +79,7 @@ export type WorkflowRunResponse = {
   totalGenerated?: number;
   totalSkipped?: number;
   message?: string;
+  runId?: string;
 };
 
 export const apiClient = {
@@ -121,6 +122,9 @@ export const apiClient = {
 
   generateCards: (brandId: string) =>
     request<WorkflowRunResponse>(`/api/brands/${brandId}/cards/generate`, 'POST', {}),
+
+  getWorkflowRun: (runId: string) =>
+    request<{ run: any }>(`/api/workflow-runs/${runId}`),
 
   publishCards: (cardIds: string[]) =>
     request<{ publishedCardIds: string[] }>(`/api/cards/publish`, 'POST', { cardIds }),

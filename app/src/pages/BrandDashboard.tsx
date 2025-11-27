@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { BrandData, Persona, Environment, Influencer, Card } from '../types';
 import CardGallery from '../components/CardGallery';
@@ -7,7 +7,7 @@ import flowformSeed from '../data/flowform-seed.json';
 import { useSelectionFilter } from '../hooks/useSelectionFilter';
 import { SelectionFilterToolbar } from '../components/SelectionFilterToolbar';
 
-type TabType = 'product' | 'influencers' | 'cards';
+type TabType = 'product' | 'influencers' | 'dataset';
 
 const MetricPill = ({ label, value }: { label: string; value: string }) => (
   <div style={{ padding: '0.35rem 0.75rem', background: '#e9ecef', borderRadius: '12px', fontSize: '0.85rem', color: '#495057', border: '1px solid #dee2e6' }}>
@@ -20,7 +20,7 @@ export default function BrandDashboard() {
   const navigate = useNavigate();
   const seedMode = import.meta.env.VITE_USE_SEED === '1';
   const initialTab: TabType =
-    tab === 'influencers' || tab === 'cards' ? (tab as TabType) : 'product';
+    tab === 'influencers' || tab === 'dataset' ? (tab as TabType) : 'product';
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [data, setData] = useState<BrandData | null>(null);
   const [influencerStates, setInfluencerStates] = useState<Record<string, { enabled: boolean }>>({});
@@ -35,6 +35,8 @@ export default function BrandDashboard() {
   const [brandProductImages, setBrandProductImages] = useState<string[]>([]);
   const [isGeneratingDataset, setIsGeneratingDataset] = useState(false);
   const [datasetUrl, setDatasetUrl] = useState<string | null>(null);
+  const [datasetRunId, setDatasetRunId] = useState<string | null>(null);
+  const [datasetRunStatus, setDatasetRunStatus] = useState<'idle' | 'running' | 'completed' | 'failed'>('idle');
   const [generationSummary, setGenerationSummary] = useState<{
     totalGenerated: number;
     totalSkipped: number;
@@ -49,6 +51,7 @@ export default function BrandDashboard() {
   });
   const [findingInfluencer, setFindingInfluencer] = useState(false);
   const [findStatus, setFindStatus] = useState<string>('');
+  const pollTimeoutRef = useRef<number | null>(null);
 
   const normalizeImage = (url: string | undefined | null, fallbackLabel: string, size = '800x600') => {
     if (url && (/^https?:\/\//i.test(url) || /^data:image\//i.test(url) || url.startsWith('/'))) return url;
@@ -117,7 +120,7 @@ export default function BrandDashboard() {
   // is the source of truth for which section is active.
   useEffect(() => {
     const nextTab: TabType =
-      tab === 'influencers' || tab === 'cards' ? (tab as TabType) : 'product';
+      tab === 'influencers' || tab === 'dataset' ? (tab as TabType) : 'product';
     if (nextTab !== activeTab) {
       setActiveTab(nextTab);
     }
@@ -643,6 +646,8 @@ export default function BrandDashboard() {
     setIsGeneratingDataset(true);
     setError(null);
     setGenerationSummary(null);
+    setDatasetRunStatus('running');
+    setDatasetRunId(null);
 
     try {
       // If specific influencers are selected, ensure they are marked as enabled
@@ -651,12 +656,73 @@ export default function BrandDashboard() {
         await handleActivateSelectedInfluencers();
       }
 
-      // Trigger card generation workflow for this brand
       const workflowResult = await apiClient.generateCards(data.brand.brandId);
+      if (workflowResult.runId) {
+        setDatasetRunId(workflowResult.runId);
+        const poll = async (attempt = 0) => {
+          try {
+            const runRes = await apiClient.getWorkflowRun(workflowResult.runId!);
+            const status = (runRes.run.status as any) || 'running';
+            setDatasetRunStatus(status);
+            if (status === 'completed') {
+              const refreshed = await apiClient.getCards(data.brand.brandId);
+              setData(prev =>
+                prev
+                  ? {
+                      ...prev,
+                      cards: refreshed.cards,
+                    }
+                  : prev,
+              );
+              const updatedStatuses: Record<string, 'draft' | 'ready' | 'published'> = {};
+              refreshed.cards.forEach(card => {
+                updatedStatuses[card.cardId] = (card.status as 'draft' | 'ready' | 'published') ?? 'draft';
+              });
+              setCardStatuses(updatedStatuses);
+              const totalCards = refreshed.cards.length;
+              const totalWithImages = refreshed.cards.filter(card => !!card.imageUrl).length;
+              const out = runRes.run.output || {};
+              setGenerationSummary({
+                totalGenerated: out.totalGenerated ?? workflowResult.totalGenerated ?? 0,
+                totalSkipped: out.totalSkipped ?? workflowResult.totalSkipped ?? 0,
+                totalCards,
+                totalWithImages,
+                message: out.message || workflowResult.message || 'Generation completed',
+              });
+              setIsGeneratingDataset(false);
+              setDatasetRunStatus('completed');
+              return;
+            }
+            if (status === 'failed') {
+              const msg = runRes.run.error || 'Card generation failed';
+              setError(msg);
+              setIsGeneratingDataset(false);
+              setDatasetRunStatus('failed');
+              return;
+            }
+            if (attempt < 30) {
+              pollTimeoutRef.current = window.setTimeout(() => poll(attempt + 1), 1000);
+            } else {
+              setError('Card generation polling timed out');
+              setIsGeneratingDataset(false);
+              setDatasetRunStatus('failed');
+            }
+          } catch (err) {
+            if (attempt < 5) {
+              pollTimeoutRef.current = window.setTimeout(() => poll(attempt + 1), 1000);
+            } else {
+              setError('Failed to poll card generation status');
+              setIsGeneratingDataset(false);
+              setDatasetRunStatus('failed');
+            }
+          }
+        };
+        poll();
+        return;
+      }
 
-      // Refresh cards from API so the gallery shows newly generated cards
+      // Fallback: no runId returned
       const refreshed = await apiClient.getCards(data.brand.brandId);
-
       setData(prev =>
         prev
           ? {
@@ -665,16 +731,13 @@ export default function BrandDashboard() {
             }
           : prev,
       );
-
       const updatedStatuses: Record<string, 'draft' | 'ready' | 'published'> = {};
       refreshed.cards.forEach(card => {
         updatedStatuses[card.cardId] = (card.status as 'draft' | 'ready' | 'published') ?? 'draft';
       });
       setCardStatuses(updatedStatuses);
-
       const totalCards = refreshed.cards.length;
       const totalWithImages = refreshed.cards.filter(card => !!card.imageUrl).length;
-
       setGenerationSummary({
         totalGenerated: workflowResult.totalGenerated ?? 0,
         totalSkipped: workflowResult.totalSkipped ?? 0,
@@ -682,8 +745,10 @@ export default function BrandDashboard() {
         totalWithImages,
         message: workflowResult.message,
       });
+      setDatasetRunStatus('completed');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to generate cards');
+      setDatasetRunStatus('failed');
     } finally {
       setIsGeneratingDataset(false);
     }
@@ -700,6 +765,14 @@ export default function BrandDashboard() {
       setDatasetUrl(url);
     }
   }, [brandId, data, datasetUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (pollTimeoutRef.current !== null) {
+        clearTimeout(pollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
@@ -752,10 +825,10 @@ export default function BrandDashboard() {
           Influencers
         </button>
         <button
-          onClick={() => navigate(`/brand/${brandId ?? data.brand.brandId}/cards`)}
-          style={tabStyle(activeTab === 'cards')}
+          onClick={() => navigate(`/brand/${brandId ?? data.brand.brandId}/dataset`)}
+          style={tabStyle(activeTab === 'dataset')}
         >
-          Cards
+          Dataset
         </button>
       </div>
 
@@ -923,10 +996,10 @@ export default function BrandDashboard() {
             )}
           </>
         )}
-        {activeTab === 'cards' && (
+        {activeTab === 'dataset' && (
           <>
             <SelectionFilterToolbar
-              title="Wisdom Cards"
+              title="Dataset Cards"
               selectedCount={selectedCards.size}
               visibleCount={filteredCards.length}
               totalCount={data.cards.length}
@@ -981,7 +1054,7 @@ export default function BrandDashboard() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1rem' }}>
               {isGeneratingDataset && (
                 <span style={{ color: '#6c757d', fontStyle: 'italic', fontSize: '0.95rem' }}>
-                  Thinking …
+                  {datasetRunStatus === 'running' ? 'Generating cards…' : 'Thinking…'}
                 </span>
               )}
               <button

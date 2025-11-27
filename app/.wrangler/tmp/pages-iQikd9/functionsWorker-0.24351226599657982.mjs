@@ -29971,6 +29971,32 @@ async function generateActionImages(headshotUrl, name, domain3, falKey) {
     throw e;
   }
 }
+async function generateCardImage(params) {
+  const falKey = params.falKey || process.env.FAL_KEY || process.env.FALAI_API_KEY;
+  if (!falKey) throw new Error("FAL key required for card image");
+  const { influencerName, influencerDomain, brandName, brandDescription, query } = params;
+  const prompt = `Photorealistic cinematic action shot of ${influencerName}, a ${influencerDomain} creator, using the ${brandName} wearable motion suit. Scene matches the question: "${query}". Include product cues from description: ${brandDescription || "motion capture suit for training and recovery"}. Dynamic lighting, sharp detail, 4k.`;
+  try {
+    const { fal } = await Promise.resolve().then(() => __toESM(require_src(), 1));
+    fal.config({ credentials: falKey });
+    const result = await fal.subscribe("fal-ai/nano-banana-pro", {
+      input: {
+        prompt,
+        num_images: 1,
+        aspect_ratio: "16:9",
+        output_format: "png",
+        resolution: "1K"
+      },
+      logs: false
+    });
+    const url2 = result?.data?.images?.[0]?.url;
+    if (!url2) throw new Error("Card image URL missing from fal response");
+    return url2;
+  } catch (err) {
+    console.error("[card-image] generation failed", err);
+    throw err;
+  }
+}
 var init_image_generation = __esm({
   "../mastra/db/image-generation.ts"() {
     init_functionsRoutes_0_4889189663689424();
@@ -29979,6 +30005,7 @@ var init_image_generation = __esm({
     init_performance2();
     __name(generateInfluencerImage, "generateInfluencerImage");
     __name(generateActionImages, "generateActionImages");
+    __name(generateCardImage, "generateCardImage");
   }
 });
 
@@ -30287,7 +30314,47 @@ function createApiApp({ db, config: config3 }) {
     return c.json({ brand: updated });
   });
   app.post("/api/brands/:brandId/cards/generate", async (c) => {
-    return c.json({ error: "Card generation workflow disabled in edge mode" }, 503);
+    const brandId = c.req.param("brandId");
+    const brand = await brandsRepo.findById(brandId);
+    if (!brand) return c.json({ error: "Brand not found" }, 404);
+    const influencersList = await influencersRepo.findEnabled();
+    const readyInfluencers = influencersList.filter((inf) => (inf.status ?? "ready") === "ready" && inf.imageUrl);
+    if (readyInfluencers.length === 0) {
+      return c.json({ error: "No ready influencers with images available for generation" }, 400);
+    }
+    const cardsCreated = [];
+    const take = Math.min(3, readyInfluencers.length);
+    const prompts = [
+      `How does ${brand.name} improve ${readyInfluencers[0].domain.toLowerCase()} training?`,
+      `What makes the ${brand.name} motion suit different for recovery and mobility?`,
+      `How can ${brand.name} help prevent injuries for everyday athletes?`
+    ];
+    for (let i = 0; i < take; i++) {
+      const inf = readyInfluencers[i];
+      const query = prompts[i % prompts.length];
+      const response = brand.description || `${brand.name} helps athletes train smarter with real-time motion feedback.`;
+      const cardImageUrl = await generateCardImage({
+        influencerName: inf.name,
+        influencerDomain: inf.domain,
+        brandName: brand.name,
+        brandDescription: brand.description || "",
+        query,
+        falKey: config3.falKey
+      });
+      const card = await cardsRepo.create({
+        brandId,
+        influencerId: inf.influencerId,
+        personaId: null,
+        environmentId: null,
+        query,
+        response,
+        imageUrl: cardImageUrl,
+        imageBrief: `Illustration of ${inf.name} using ${brand.name} in a ${inf.domain} context: ${query}`,
+        status: "draft"
+      });
+      cardsCreated.push(card.cardId);
+    }
+    return c.json({ cardIds: cardsCreated, totalGenerated: cardsCreated.length, totalSkipped: 0, message: "Draft cards generated with fal images (edge mode)" }, 201);
   });
   app.get("/api/brands/:brandId/cards", async (c) => {
     const brandId = c.req.param("brandId");
@@ -30317,12 +30384,17 @@ function createApiApp({ db, config: config3 }) {
   app.post("/api/cards/delete", async (c) => {
     const body = await c.req.json();
     const { cardIds } = parse3(deleteCardsSchema, body);
+    const validIds = cardIds.filter((id) => uuidRe.test(id));
+    const invalidIds = cardIds.filter((id) => !uuidRe.test(id));
+    if (validIds.length === 0) {
+      return c.json({ error: "No valid cardIds provided", invalidIds }, 400);
+    }
     let deleted = 0;
-    for (const cardId of cardIds) {
+    for (const cardId of validIds) {
       await cardsRepo.delete(cardId);
       deleted++;
     }
-    return c.json({ deleted });
+    return c.json({ deleted, invalidIds });
   });
   app.post("/api/cards/unpublish", async (c) => {
     const body = await c.req.json();
@@ -30641,7 +30713,7 @@ function createApiApp({ db, config: config3 }) {
   });
   return app;
 }
-var createBrandSchema, publishCardsSchema, deleteCardsSchema, unpublishCardsSchema, updateInfluencerEnabledSchema, escapeHtml, parse3, defaultAllowedOrigins;
+var createBrandSchema, publishCardsSchema, deleteCardsSchema, unpublishCardsSchema, updateInfluencerEnabledSchema, escapeHtml, parse3, defaultAllowedOrigins, uuidRe;
 var init_app = __esm({
   "../api/app.ts"() {
     init_functionsRoutes_0_4889189663689424();
@@ -30668,7 +30740,7 @@ var init_app = __esm({
       cardIds: external_exports.array(external_exports.string().uuid())
     });
     deleteCardsSchema = external_exports.object({
-      cardIds: external_exports.array(external_exports.string().uuid())
+      cardIds: external_exports.array(external_exports.string().trim()).min(1)
     });
     unpublishCardsSchema = external_exports.object({
       cardIds: external_exports.array(external_exports.string().uuid())
@@ -30683,6 +30755,7 @@ var init_app = __esm({
       return result.data;
     }, "parse");
     defaultAllowedOrigins = ["http://localhost:5173", "https://wisdom-pixels.pages.dev"];
+    uuidRe = /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/;
     __name(createApiApp, "createApiApp");
   }
 });
@@ -31090,13 +31163,13 @@ var init_functionsRoutes_0_4889189663689424 = __esm({
   }
 });
 
-// ../.wrangler/tmp/bundle-bw6xt7/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-onUgvs/middleware-loader.entry.ts
 init_functionsRoutes_0_4889189663689424();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_console();
 init_performance2();
 
-// ../.wrangler/tmp/bundle-bw6xt7/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-onUgvs/middleware-insertion-facade.js
 init_functionsRoutes_0_4889189663689424();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_console();
@@ -31607,7 +31680,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env2, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-bw6xt7/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-onUgvs/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -31643,7 +31716,7 @@ function __facade_invoke__(request, env2, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-bw6xt7/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-onUgvs/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

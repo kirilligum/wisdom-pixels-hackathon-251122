@@ -7,7 +7,8 @@ import { PersonasRepository } from '../mastra/db/repositories/personas.repositor
 import { EnvironmentsRepository } from '../mastra/db/repositories/environments.repository';
 import { CardsRepository } from '../mastra/db/repositories/cards.repository';
 import { InfluencersRepository } from '../mastra/db/repositories/influencers.repository';
-import { generateInfluencerImage, generateActionImages } from '../mastra/db/image-generation';
+import { WorkflowRunsRepository } from '../mastra/db/repositories/workflow-runs.repository';
+import { generateInfluencerImage, generateActionImages, generateCardImage } from '../mastra/db/image-generation';
 import type { Influencer } from '../mastra/db/schema';
 import type { Database } from '../mastra/db/types';
 import { buildBio, ensureUniqueName, findNewRequestSchema, pickRandomCandidate } from './find-new-support';
@@ -32,7 +33,7 @@ const publishCardsSchema = z.object({
 });
 
 const deleteCardsSchema = z.object({
-  cardIds: z.array(z.string().uuid()),
+  cardIds: z.array(z.string().trim()).min(1).or(z.array(z.string().trim()).length(0)),
 });
 
 const unpublishCardsSchema = z.object({
@@ -57,7 +58,14 @@ const parse = <T>(schema: z.ZodSchema<T>, data: unknown) => {
   return result.data;
 };
 
-const defaultAllowedOrigins = ['http://localhost:5173', 'https://wisdom-pixels.pages.dev'];
+  const defaultAllowedOrigins = ['http://localhost:5173', 'https://wisdom-pixels.pages.dev'];
+const uuidRe =
+  /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/;
+const defaultCardPrompts = [
+  (brand: string, domain: string) => `How does ${brand} improve ${domain.toLowerCase()} training?`,
+  (brand: string) => `What makes the ${brand} motion suit different for recovery and mobility?`,
+  (brand: string) => `How can ${brand} help prevent injuries for everyday athletes?`,
+];
 
 export function createApiApp({ db, config }: { db: Database; config: ApiConfig }) {
   const app = new Hono<{ Variables: { auth?: JWTPayload } }>();
@@ -114,6 +122,7 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
   const environmentsRepo = new EnvironmentsRepository(db);
   const cardsRepo = new CardsRepository(db);
   const influencersRepo = new InfluencersRepository(db);
+  const workflowRunsRepo = new WorkflowRunsRepository(db);
 
   async function ensureInfluencerGallery(inf: Influencer) {
     let headshot = inf.imageUrl;
@@ -321,7 +330,74 @@ app.post('/api/brands', async (c) => {
   });
 
   app.post('/api/brands/:brandId/cards/generate', async (c) => {
-    return c.json({ error: 'Card generation workflow disabled in edge mode' }, 503);
+    const brandId = c.req.param('brandId');
+    const brand = await brandsRepo.findById(brandId);
+    if (!brand) return c.json({ error: 'Brand not found' }, 404);
+
+    const run = await workflowRunsRepo.create({
+      workflowName: 'CardGeneration',
+      brandId,
+      status: 'running',
+      input: { brandId },
+      output: { cardIds: [], totalSkipped: 0 },
+    } as any);
+
+    const influencersList = await influencersRepo.findEnabled();
+    const readyInfluencers = influencersList.filter((inf: any) => (inf.status ?? 'ready') === 'ready' && inf.imageUrl);
+    if (readyInfluencers.length === 0) {
+      return c.json({ error: 'No ready influencers with images available for generation' }, 400);
+    }
+
+    const cardsCreated: string[] = [];
+    let totalSkipped = 0;
+    const take = Math.min(3, readyInfluencers.length);
+    const prompts = defaultCardPrompts.map((fn) => fn(brand.name, readyInfluencers[0].domain));
+
+    try {
+      for (let i = 0; i < take; i++) {
+        const inf = readyInfluencers[i];
+        const query = prompts[i % prompts.length];
+        const response = brand.description || `${brand.name} helps athletes train smarter with real-time motion feedback.`;
+
+        // Generate a fresh image per card using fal.ai with a bounded timeout
+        const cardImageUrl = await withTimeout(
+          generateCardImage({
+            influencerName: inf.name,
+            influencerDomain: inf.domain,
+            brandName: brand.name,
+            brandDescription: brand.description || '',
+            query,
+            falKey: config.falKey,
+          }),
+          45000,
+        );
+
+        const card = await cardsRepo.create({
+          brandId,
+          influencerId: inf.influencerId,
+          personaId: null,
+          environmentId: null,
+          query,
+          response,
+          imageUrl: cardImageUrl,
+          imageBrief: `Illustration of ${inf.name} using ${brand.name} in a ${inf.domain} context: ${query}`,
+          status: 'draft',
+        } as any);
+        cardsCreated.push(card.cardId);
+      }
+    } catch (err) {
+      console.error('[cards.generate] fal image generation failed', err);
+      await workflowRunsRepo.update(run.runId, { status: 'failed', error: (err as any)?.message || String(err), output: { cardIds: cardsCreated, totalSkipped } });
+      return c.json({ error: 'Card image generation failed', details: (err as any)?.message || String(err), runId: run.runId }, 502);
+    }
+
+    await workflowRunsRepo.update(run.runId, {
+      status: 'completed',
+      output: { cardIds: cardsCreated, totalSkipped, totalGenerated: cardsCreated.length },
+      completedAt: new Date(),
+    } as any);
+
+    return c.json({ cardIds: cardsCreated, totalGenerated: cardsCreated.length, totalSkipped, runId: run.runId, message: 'Draft cards generated with fal images (edge mode)' }, 201);
   });
 
   app.get('/api/brands/:brandId/cards', async (c) => {
@@ -339,11 +415,43 @@ app.post('/api/brands', async (c) => {
     return c.json({ card });
   });
 
+  app.get('/api/workflow-runs/:runId', async (c) => {
+    const runId = c.req.param('runId');
+    const run = await workflowRunsRepo.findById(runId);
+    if (!run) return c.json({ error: 'Run not found' }, 404);
+    return c.json({ run });
+  });
+
   app.post('/api/cards/publish', async (c) => {
     const body = await c.req.json();
     const { cardIds } = parse(publishCardsSchema, body);
 
+    // Edge-friendly fallback: publish directly if mastra workflows unavailable
+    if (typeof mastra === 'undefined' || !mastra?.getWorkflow) {
+      let publishedCount = 0;
+      let failedCount = 0;
+      const publishedCardIds: string[] = [];
+      for (const id of cardIds) {
+        const updated = await cardsRepo.update(id, { status: 'published', publishedAt: new Date() });
+        if (updated) {
+          publishedCount++;
+          publishedCardIds.push(id);
+        } else {
+          failedCount++;
+        }
+      }
+      return c.json({
+        publishedCount,
+        failedCount,
+        invalidCount: failedCount,
+        publishedCardIds,
+        message: 'Published directly (edge mode fallback)',
+      });
+    }
+
     const workflow = mastra.getWorkflow('publishingWorkflow');
+    if (!workflow) return c.json({ error: 'Publishing workflow unavailable' }, 503);
+
     const run = await workflow.createRunAsync();
     const result = await run.start({ inputData: { cardIds } });
 
@@ -358,6 +466,7 @@ app.post('/api/brands', async (c) => {
   app.post('/api/cards/delete', async (c) => {
     const body = await c.req.json();
     const { cardIds } = parse(deleteCardsSchema, body);
+    if (!cardIds.length) return c.json({ error: 'No cardIds provided' }, 400);
 
     let deleted = 0;
     for (const cardId of cardIds) {
@@ -510,7 +619,8 @@ app.post('/api/brands', async (c) => {
       });
     }
 
-    const cards = await cardsRepo.findByBrandId(brandId, {});
+    const cardsAll = await cardsRepo.findByBrandId(brandId, {});
+    const cards = cardsAll.filter((c) => c.status === 'published');
     const influencers = await influencersRepo.findAll();
     const influencerMap = new Map(influencers.map((i) => [i.influencerId, i.name]));
 
@@ -622,7 +732,8 @@ app.post('/api/brands', async (c) => {
       });
     }
 
-    const cards = await cardsRepo.findByBrandId(brandId, {});
+    const cardsAll = await cardsRepo.findByBrandId(brandId, {});
+    const cards = cardsAll.filter((c) => c.status === 'published');
     const influencers = await influencersRepo.findAll();
     const influencerMap = new Map(influencers.map((i) => [i.influencerId, i.name]));
 
