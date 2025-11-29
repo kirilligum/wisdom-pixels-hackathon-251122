@@ -8,7 +8,7 @@ import { EnvironmentsRepository } from '../mastra/db/repositories/environments.r
 import { CardsRepository } from '../mastra/db/repositories/cards.repository';
 import { InfluencersRepository } from '../mastra/db/repositories/influencers.repository';
 import { WorkflowRunsRepository } from '../mastra/db/repositories/workflow-runs.repository';
-import { generateInfluencerImage, generateActionImages, generateCardImage } from '../mastra/db/image-generation';
+import { generateInfluencerImage, generateActionImages, generateCardImage, generateAdhocImage, generateInfluencerImageSet } from '../mastra/db/image-generation';
 import type { Influencer } from '../mastra/db/schema';
 import type { Database } from '../mastra/db/types';
 import { buildBio, ensureUniqueName, findNewRequestSchema, pickRandomCandidate } from './find-new-support';
@@ -66,6 +66,20 @@ const defaultCardPrompts = [
   (brand: string) => `What makes the ${brand} motion suit different for recovery and mobility?`,
   (brand: string) => `How can ${brand} help prevent injuries for everyday athletes?`,
 ];
+const MAX_INLINE_IMAGE = 8000;
+
+const normalizeImageUrl = (url: string | null | undefined) => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('data:') || trimmed.length > MAX_INLINE_IMAGE) {
+    return '';
+  }
+  return trimmed;
+};
+
+const normalizeActionUrls = (urls: string[] | null | undefined) =>
+  (urls || []).map((u) => normalizeImageUrl(u)).filter(Boolean) as string[];
 
 export function createApiApp({ db, config }: { db: Database; config: ApiConfig }) {
   const app = new Hono<{ Variables: { auth?: JWTPayload } }>();
@@ -124,44 +138,29 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
   const influencersRepo = new InfluencersRepository(db);
   const workflowRunsRepo = new WorkflowRunsRepository(db);
 
-  async function ensureInfluencerGallery(inf: Influencer) {
-    let headshot = inf.imageUrl;
-    let actionImages = inf.actionImageUrls ?? [];
-
-    if (!headshot) {
-      headshot = await generateInfluencerImage(inf.name, inf.domain, config.falKey);
-    }
-
-    if (!actionImages || actionImages.length === 0) {
-      actionImages = await generateActionImages(headshot, inf.name, inf.domain, config.falKey);
-      await influencersRepo.update(inf.influencerId, {
-        imageUrl: headshot,
-        actionImageUrls: actionImages,
-        status: 'ready',
-        errorMessage: null,
-      });
-    } else {
-      await influencersRepo.update(inf.influencerId, {
-        imageUrl: headshot,
-        actionImageUrls: actionImages,
-        status: 'ready',
-        errorMessage: null,
-      });
-    }
-
-    return { headshot, actionImages };
-  }
-
   async function normalizeStatus(list: Influencer[]) {
     const normalized: Influencer[] = [];
     for (const inf of list) {
-      const shouldBeReady = inf.imageUrl && inf.actionImageUrls && inf.actionImageUrls.length > 0;
-      if (shouldBeReady && (inf as any).status !== 'ready') {
-        const updated = await influencersRepo.update(inf.influencerId, { status: 'ready', errorMessage: null });
-        normalized.push(updated || inf);
-      } else {
-        normalized.push(inf);
+      const cleanedImageUrl = normalizeImageUrl(inf.imageUrl);
+      const cleanedActionUrls = normalizeActionUrls(inf.actionImageUrls);
+      const shouldBeReady = cleanedImageUrl && cleanedActionUrls.length > 0;
+      const needsUpdate =
+        cleanedImageUrl !== inf.imageUrl ||
+        JSON.stringify(cleanedActionUrls) !== JSON.stringify(inf.actionImageUrls || []) ||
+        (shouldBeReady && (inf as any).status !== 'ready') ||
+        (!shouldBeReady && (inf as any).status === 'ready');
+
+      if (needsUpdate) {
+        const updated = await influencersRepo.update(inf.influencerId, {
+          imageUrl: cleanedImageUrl,
+          actionImageUrls: cleanedActionUrls,
+          status: shouldBeReady ? 'ready' : 'failed',
+          errorMessage: shouldBeReady ? null : 'Image data missing or invalid',
+        });
+        normalized.push(updated || { ...inf, imageUrl: cleanedImageUrl, actionImageUrls: cleanedActionUrls, status: shouldBeReady ? 'ready' : 'failed' });
+        continue;
       }
+      normalized.push(inf);
     }
     return normalized;
   }
@@ -171,6 +170,25 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
 
   const withTimeout = async <T>(p: Promise<T>, ms: number): Promise<T> =>
     await Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  async function withRetry<T>(fn: () => Promise<T>, attempts = 3, delayMs = 1000): Promise<T> {
+    let lastErr: any;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastErr = err;
+        if (i < attempts - 1) await sleep(delayMs * (i + 1));
+      }
+    }
+    throw lastErr;
+  }
+
+  async function fetchImageSet(name: string, domain: string) {
+    return await withTimeout(withRetry(() => generateInfluencerImageSet(name, domain, config.falKey, 3), 3, 1000), 60000);
+  }
 
   async function tryFalImage(name: string, domain: string, fn: () => Promise<string>, timeoutMs: number, retries = 1) {
     let lastErr: unknown;
@@ -186,54 +204,20 @@ export function createApiApp({ db, config }: { db: Database; config: ApiConfig }
     throw lastErr || new Error('fal image failed');
   }
 
-  async function createInfluencerWithImages(
-    data: { name: string; bio: string; domain: string; imageUrl?: string; actionImageUrls?: string[] },
-    options: { preferFal?: boolean; falTimeoutMs?: number } = {},
-  ) {
-    const name = data.name.trim();
-    const domain = (data.domain || 'Fitness & Performance').trim() || 'Fitness & Performance';
-    const bio = (data.bio || `Creator focused on ${domain.toLowerCase()}.`).trim();
-    let headshot = data.imageUrl;
-    let actionImageUrls = data.actionImageUrls;
-    const falKey = config.falKey || process.env.FAL_KEY || process.env.FALAI_API_KEY;
-    const hasFalKey = options.preferFal !== false && Boolean(falKey);
-    if (!hasFalKey) throw new Error('FAL key required for influencer creation');
-    const falTimeoutMs = options.falTimeoutMs ?? 45000;
-
-    headshot = await tryFalImage(name, domain, () => generateInfluencerImage(name, domain, config.falKey), falTimeoutMs, 1);
-
-    actionImageUrls = await tryFalImage(
-      name,
-      domain,
-      async () => {
-        const imgs = await generateActionImages(headshot || '', name, domain, config.falKey);
-        return imgs.join('|||');
-      },
-      falTimeoutMs,
-      0,
-    ).then((joined) => joined.split('|||'));
-
-    if (!headshot || looksLikePlaceholder(headshot)) {
-      throw new Error('Failed to generate headshot');
-    }
-    if (!actionImageUrls || actionImageUrls.length === 0 || actionImageUrls.some(looksLikePlaceholder)) {
-      throw new Error('Failed to generate action images');
-    }
-
-    return influencersRepo.create({ ...data, name, domain, bio, enabled: true, imageUrl: headshot, actionImageUrls });
-  }
-
-  async function generateAndPersistInfluencer(influencer: Influencer) {
-    try {
-      await influencersRepo.update(influencer.influencerId, { status: 'pending', errorMessage: null });
-      const headshot = await generateInfluencerImage(influencer.name, influencer.domain, config.falKey);
-      await influencersRepo.update(influencer.influencerId, { imageUrl: headshot, status: 'headshot_ready' });
-      const actionImages = await generateActionImages(headshot, influencer.name, influencer.domain, config.falKey);
-      await influencersRepo.update(influencer.influencerId, { actionImageUrls: actionImages, status: 'ready', errorMessage: null });
-    } catch (err) {
-      await influencersRepo.update(influencer.influencerId, { status: 'failed', errorMessage: err instanceof Error ? err.message : String(err) });
-      throw err;
-    }
+  async function createInfluencerStub(data: { name: string; bio: string; domain: string; enabled?: boolean }) {
+    const createdRow = await influencersRepo.create({
+      influencerId: crypto.randomUUID(),
+      name: data.name,
+      bio: data.bio,
+      domain: data.domain,
+      imageUrl: '',
+      actionImageUrls: [],
+      enabled: data.enabled ?? true,
+      status: 'pending',
+      errorMessage: null,
+      createdAt: new Date(),
+    } as any);
+    return createdRow;
   }
 
   async function upgradePlaceholdersWithFal(influencers: any[]) {
@@ -530,12 +514,17 @@ app.post('/api/brands', async (c) => {
 
   app.get('/api/influencers/:influencerId/gallery', async (c) => {
     const influencerId = c.req.param('influencerId');
-    const inf = await influencersRepo.findById(influencerId);
-    if (!inf) return c.json({ error: 'Influencer not found' }, 404);
-
-    const { headshot, actionImages } = await ensureInfluencerGallery(inf);
-
-    return c.json({ headshot, actionImages });
+    try {
+      const inf = await influencersRepo.findById(influencerId);
+      if (!inf) return c.json({ error: 'Influencer not found' }, 404);
+      return c.json({
+        version: 'gallery-readonly-2',
+        headshot: inf.imageUrl || '',
+        actionImages: inf.actionImageUrls || [],
+      });
+    } catch (err: any) {
+      return c.json({ error: 'Internal server error', message: err?.message || String(err) }, 500);
+    }
   });
 
   app.delete('/api/influencers/:influencerId', async (c) => {
@@ -557,6 +546,9 @@ app.post('/api/brands', async (c) => {
   });
 
   app.post('/api/influencers/find-new', async (c) => {
+    if (!config.falKey) {
+      return c.json({ error: 'FAL key missing. Set FALAI_API_KEY (or FAL_KEY) in production.' }, 503);
+    }
     let requested: { name?: string; bio?: string; domain?: string; brief?: string } = {};
     try {
       const body = await c.req.json();
@@ -569,44 +561,155 @@ app.post('/api/brands', async (c) => {
     const all = await influencersRepo.findAll();
     const existingNames = new Set(all.map(i => i.name.toLowerCase()));
 
-    const created: any[] = [];
-    const updated: any[] = [];
-    const skipped: any[] = [];
-
-    // If a custom influencer is requested, add it even if existing list is empty
+    // Choose candidate
+    let candidate;
     if (requested.name || requested.bio || requested.domain) {
       const candidateDomain = (requested.domain || 'Fitness & Performance').trim();
       const candidateName = ensureUniqueName(requested.name || 'New Creator', existingNames);
       const candidateBio = (requested.bio || buildBio(candidateName, candidateDomain, requested.brief)).trim();
-      const createdRow = await influencersRepo.create({
-        name: candidateName,
-        bio: candidateBio,
-        domain: candidateDomain,
-        imageUrl: '',
-        actionImageUrls: [],
-        enabled: true,
-        status: 'pending',
-        errorMessage: null,
-      } as any);
-      created.push(createdRow);
-      void generateAndPersistInfluencer(createdRow);
+      candidate = { name: candidateName, bio: candidateBio, domain: candidateDomain };
     } else {
-      // No payload: create exactly one new random influencer aligned to FlowForm use-cases
-      const candidate = pickRandomCandidate(existingNames);
-      const createdRow = await influencersRepo.create({
-        ...candidate,
-        imageUrl: '',
-        actionImageUrls: [],
-        enabled: true,
-        status: 'pending',
-        errorMessage: null,
-      } as any);
-      created.push(createdRow);
-      void generateAndPersistInfluencer(createdRow);
+      candidate = pickRandomCandidate(existingNames);
     }
 
-    const finalList = await influencersRepo.findEnabled();
-    return new Response(JSON.stringify({ influencers: finalList, created, updated, skipped }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const created = await createInfluencerStub({
+      ...candidate,
+      enabled: true,
+    });
+
+    return c.json({ influencer: created, status: 'pending' }, 202);
+  });
+
+  app.get('/api/influencers/:influencerId/status', async (c) => {
+    const influencerId = c.req.param('influencerId');
+    const inf = await influencersRepo.findById(influencerId);
+    if (!inf) return c.json({ error: 'Influencer not found' }, 404);
+    return c.json({ influencer: inf });
+  });
+
+  app.post('/api/influencers/:influencerId/generate/headshot', async (c) => {
+    if (!config.falKey) return c.json({ error: 'FAL key missing' }, 503);
+    const influencerId = c.req.param('influencerId');
+    const inf = await influencersRepo.findById(influencerId);
+    if (!inf) return c.json({ error: 'Influencer not found' }, 404);
+    try {
+      // Try combined set first to reduce latency; falls back to portrait-only
+      try {
+        const set = await fetchImageSet(inf.name, inf.domain);
+        const headshot = set[0];
+        const actionsFromSet = set.slice(1);
+        const updated = await influencersRepo.update(influencerId, {
+          imageUrl: headshot,
+          actionImageUrls: actionsFromSet,
+          status: actionsFromSet.length > 0 ? 'ready' : 'headshot_ready',
+          errorMessage: null,
+        });
+        return c.json({ headshot, actionImages: actionsFromSet, influencer: updated }, 200);
+      } catch (setErr) {
+        const headshot = await withTimeout(withRetry(() => generateInfluencerImage(inf.name, inf.domain, config.falKey), 3, 1000), 60000);
+        const updated = await influencersRepo.update(influencerId, { imageUrl: headshot, status: 'headshot_ready', errorMessage: null });
+        return c.json({ headshot, influencer: updated, warning: (setErr as any)?.message || String(setErr) }, 200);
+      }
+    } catch (err: any) {
+      await influencersRepo.update(influencerId, {
+        status: 'failed',
+        errorMessage: err?.message || String(err),
+      });
+      return c.json({ error: 'Headshot generation failed', message: err?.message || String(err) }, 502);
+    }
+  });
+
+  app.post('/api/influencers/:influencerId/generate/actions', async (c) => {
+    if (!config.falKey) return c.json({ error: 'FAL key missing' }, 503);
+    const influencerId = c.req.param('influencerId');
+    const inf = await influencersRepo.findById(influencerId);
+    if (!inf) return c.json({ error: 'Influencer not found' }, 404);
+    if (inf.actionImageUrls && inf.actionImageUrls.length > 0 && (inf as any).status === 'ready') {
+      return c.json({ actionImages: inf.actionImageUrls, influencer: inf });
+    }
+    try {
+      try {
+        const actions = await withTimeout(withRetry(() => generateActionImages(inf.imageUrl, inf.name, inf.domain, config.falKey), 3, 1000), 60000);
+        const updated = await influencersRepo.update(influencerId, { actionImageUrls: actions, status: 'ready', errorMessage: null });
+        return c.json({ actionImages: actions, influencer: updated });
+      } catch (primaryErr) {
+        const set = await fetchImageSet(inf.name, inf.domain);
+        const headshot = set[0] || inf.imageUrl;
+        const actions = set.slice(1);
+        const updated = await influencersRepo.update(influencerId, { imageUrl: headshot, actionImageUrls: actions, status: actions.length > 0 ? 'ready' : 'failed', errorMessage: actions.length > 0 ? null : (primaryErr as any)?.message || String(primaryErr) });
+        if (actions.length > 0) {
+          return c.json({ actionImages: actions, influencer: updated, warning: (primaryErr as any)?.message || String(primaryErr) });
+        }
+        throw primaryErr;
+      }
+    } catch (err: any) {
+      await influencersRepo.update(influencerId, { status: 'failed', errorMessage: err?.message || String(err) });
+      return c.json({ error: 'Action image generation failed', message: err?.message || String(err) }, 502);
+    }
+  });
+
+  app.post('/api/images/generate', async (c) => {
+    if (!config.falKey) {
+      return c.json({ error: 'FAL key missing. Set FALAI_API_KEY (or FAL_KEY) in production.' }, 503);
+    }
+    let prompt = '';
+    try {
+      const body = await c.req.json();
+      prompt = (body?.prompt || '').trim();
+    } catch {
+      prompt = '';
+    }
+    if (!prompt) return c.json({ error: 'Prompt required' }, 400);
+    try {
+      // Bound the fal call to avoid long hangs; return 504 on timeout.
+      const url = await withTimeout(generateAdhocImage(prompt, config.falKey), 45000);
+      return c.json({ url }, 200);
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      const status = msg === 'timeout' ? 504 : 502;
+      return c.json({ error: 'Image generation failed', message: msg }, status);
+    }
+  });
+
+  app.post('/api/influencers/:influencerId/retry-images', async (c) => {
+    if (!config.falKey) return c.json({ error: 'FAL key missing' }, 503);
+    const influencerId = c.req.param('influencerId');
+    const inf = await influencersRepo.findById(influencerId);
+    if (!inf) return c.json({ error: 'Influencer not found' }, 404);
+    if ((inf as any).status !== 'failed') return c.json({ error: 'Retry allowed only when failed' }, 409);
+
+    try {
+      let headshot = inf.imageUrl;
+      if (!headshot) {
+        try {
+          headshot = await withTimeout(withRetry(() => generateInfluencerImage(inf.name, inf.domain, config.falKey), 3, 1000), 60000);
+        } catch (primaryErr) {
+          const set = await fetchImageSet(inf.name, inf.domain);
+          headshot = set[0];
+          const actionsFromSet = set.slice(1);
+          const updated = await influencersRepo.update(influencerId, { imageUrl: headshot, actionImageUrls: actionsFromSet, status: actionsFromSet.length > 0 ? 'ready' : 'headshot_ready', errorMessage: null });
+          return c.json({ headshot, actionImages: actionsFromSet, influencer: updated, warning: (primaryErr as any)?.message || String(primaryErr) });
+        }
+        await influencersRepo.update(influencerId, { imageUrl: headshot, status: 'headshot_ready', errorMessage: null });
+      }
+
+      try {
+        const actions = await withTimeout(withRetry(() => generateActionImages(headshot, inf.name, inf.domain, config.falKey), 3, 1000), 60000);
+        const updated = await influencersRepo.update(influencerId, { actionImageUrls: actions, status: 'ready', errorMessage: null });
+        return c.json({ headshot, actionImages: actions, influencer: updated });
+      } catch (primaryErr) {
+        const set = await fetchImageSet(inf.name, inf.domain);
+        const actionsFromSet = set.slice(1);
+        const updated = await influencersRepo.update(influencerId, { imageUrl: headshot, actionImageUrls: actionsFromSet, status: actionsFromSet.length > 0 ? 'ready' : 'failed', errorMessage: actionsFromSet.length > 0 ? null : (primaryErr as any)?.message || String(primaryErr) });
+        if (actionsFromSet.length > 0) {
+          return c.json({ headshot, actionImages: actionsFromSet, influencer: updated, warning: (primaryErr as any)?.message || String(primaryErr) });
+        }
+        throw primaryErr;
+      }
+    } catch (err: any) {
+      await influencersRepo.update(influencerId, { status: 'failed', errorMessage: err?.message || String(err) });
+      return c.json({ error: 'Retry failed', message: err?.message || String(err) }, 502);
+    }
   });
 
   app.get('/dataset/:brandId', async (c) => {

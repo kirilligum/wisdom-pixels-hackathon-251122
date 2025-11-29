@@ -1,5 +1,27 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const USE_SEED = import.meta.env.VITE_USE_SEED === '1';
+const BASE_URL = (() => {
+  const envBase = import.meta.env.VITE_API_URL?.trim();
+  const hasWindow = typeof window !== 'undefined';
+  const looksLocal = envBase && (envBase.includes('127.0.0.1') || envBase.includes('localhost'));
+  const origin = hasWindow ? window.location.origin : undefined;
+
+  // In production, if the env accidentally points to localhost, prefer same-origin so Pages/Workers work.
+  if (looksLocal && origin) {
+    return origin;
+  }
+
+  if (envBase) return envBase;
+  if (origin) return origin;
+  return 'http://localhost:3001';
+})();
+
+const USE_SEED = (() => {
+  const flag = import.meta.env.VITE_USE_SEED === '1';
+  const hasWindow = typeof window !== 'undefined';
+  const isLocalOrigin = hasWindow && /^(https?:\/\/localhost|https?:\/\/127\.0\.0\.1)/i.test(window.location.origin);
+  // Disable seed mode automatically when not running on localhost to avoid shipping seed data to production.
+  if (!isLocalOrigin) return false;
+  return flag;
+})();
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
@@ -113,11 +135,12 @@ export const apiClient = {
     request<{ influencer: Influencer }>(`/api/influencers/${influencerId}/enabled`, 'PATCH', { enabled }),
 
   findNewInfluencers: (payload?: { name?: string; bio?: string; domain?: string; brief?: string }) =>
-    request<{ influencers: Influencer[]; created?: Influencer[]; updated?: Influencer[]; skipped?: Influencer[] }>(
-      `/api/influencers/find-new`,
-      'POST',
-      payload || {},
-    ),
+    request<{ influencer: Influencer; status: string }>(`/api/influencers/find-new`, 'POST', payload || {}),
+  getInfluencerStatus: (influencerId: string) => request<{ influencer: Influencer }>(`/api/influencers/${influencerId}/status`),
+  generateInfluencerHeadshot: (influencerId: string) =>
+    request<{ headshot: string; influencer: Influencer }>(`/api/influencers/${influencerId}/generate/headshot`, 'POST', {}),
+  generateInfluencerActions: (influencerId: string) =>
+    request<{ actionImages: string[]; influencer: Influencer }>(`/api/influencers/${influencerId}/generate/actions`, 'POST', {}),
   deleteInfluencer: (influencerId: string) => request<{}>(`/api/influencers/${influencerId}`, 'DELETE'),
 
   generateCards: (brandId: string) =>
@@ -137,6 +160,9 @@ export const apiClient = {
 
   generateContent: (prompt: string) =>
     request<{ text: string }>(`/api/content/generate`, 'POST', { prompt }),
+
+  generateImage: (prompt: string) =>
+    request<{ url: string }>(`/api/images/generate`, 'POST', { prompt }),
 
   addProductImage: (brandId: string, imageUrl: string) =>
     request<{ brand: Brand }>(`/api/brands/${brandId}/images`, 'POST', { url: imageUrl }),

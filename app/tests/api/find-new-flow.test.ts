@@ -59,11 +59,10 @@ describe('Find New API flow (regression)', () => {
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const body: any = await res.json();
-    expect(body.influencers).toHaveLength(1);
-    const names = body.influencers.map((i: any) => i.name.toLowerCase());
-    expect(names.some((n: string) => legacyNames.has(n))).toBe(false);
+    expect(body.influencer).toBeDefined();
+    expect(legacyNames.has(body.influencer.name.toLowerCase())).toBe(false);
   });
 
   test('second call adds exactly one unique influencer, no legacy names', async () => {
@@ -72,21 +71,20 @@ describe('Find New API flow (regression)', () => {
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
     });
-    expect(first.status).toBe(200);
+    expect(first.status).toBe(202);
     const firstBody: any = await first.json();
-    expect(firstBody.influencers).toHaveLength(1);
+    const firstName = firstBody.influencer.name.toLowerCase();
 
     const second = await app.request('/api/influencers/find-new', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
     });
-    expect(second.status).toBe(200);
+    expect(second.status).toBe(202);
     const secondBody: any = await second.json();
-    expect(secondBody.influencers).toHaveLength(2);
-
-    const names = secondBody.influencers.map((i: any) => i.name.toLowerCase());
-    expect(new Set(names).size).toBe(2);
-    expect(names.some((n: string) => legacyNames.has(n))).toBe(false);
+    const secondName = secondBody.influencer.name.toLowerCase();
+    expect(secondName).not.toBe(firstName);
+    expect(legacyNames.has(firstName)).toBe(false);
+    expect(legacyNames.has(secondName)).toBe(false);
   });
 });

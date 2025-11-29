@@ -7,7 +7,7 @@ import flowformSeed from '../data/flowform-seed.json';
 import { useSelectionFilter } from '../hooks/useSelectionFilter';
 import { SelectionFilterToolbar } from '../components/SelectionFilterToolbar';
 
-type TabType = 'product' | 'influencers' | 'dataset';
+type TabType = 'product' | 'influencers' | 'dataset' | 'llm';
 
 const MetricPill = ({ label, value }: { label: string; value: string }) => (
   <div style={{ padding: '0.35rem 0.75rem', background: '#e9ecef', borderRadius: '12px', fontSize: '0.85rem', color: '#495057', border: '1px solid #dee2e6' }}>
@@ -20,7 +20,7 @@ export default function BrandDashboard() {
   const navigate = useNavigate();
   const seedMode = import.meta.env.VITE_USE_SEED === '1';
   const initialTab: TabType =
-    tab === 'influencers' || tab === 'dataset' ? (tab as TabType) : 'product';
+    tab === 'influencers' || tab === 'dataset' || tab === 'llm' ? (tab as TabType) : 'product';
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [data, setData] = useState<BrandData | null>(null);
   const [influencerStates, setInfluencerStates] = useState<Record<string, { enabled: boolean }>>({});
@@ -35,7 +35,6 @@ export default function BrandDashboard() {
   const [brandProductImages, setBrandProductImages] = useState<string[]>([]);
   const [isGeneratingDataset, setIsGeneratingDataset] = useState(false);
   const [datasetUrl, setDatasetUrl] = useState<string | null>(null);
-  const [datasetRunId, setDatasetRunId] = useState<string | null>(null);
   const [datasetRunStatus, setDatasetRunStatus] = useState<'idle' | 'running' | 'completed' | 'failed'>('idle');
   const [generationSummary, setGenerationSummary] = useState<{
     totalGenerated: number;
@@ -51,12 +50,19 @@ export default function BrandDashboard() {
   });
   const [findingInfluencer, setFindingInfluencer] = useState(false);
   const [findStatus, setFindStatus] = useState<string>('');
+  const [llmPrompt, setLlmPrompt] = useState('Say hello from gpt-oss-120b via fal.ai');
+  const [llmResponse, setLlmResponse] = useState<string>('');
+  const [llmLoading, setLlmLoading] = useState(false);
+  const [llmError, setLlmError] = useState<string | null>(null);
+  const [imgPrompt, setImgPrompt] = useState('Photo of a fitness creator using the FlowForm motion suit in a city park');
+  const [imgUrl, setImgUrl] = useState<string>('');
+  const [imgLoading, setImgLoading] = useState(false);
+  const [imgError, setImgError] = useState<string | null>(null);
   const pollTimeoutRef = useRef<number | null>(null);
 
-  const normalizeImage = (url: string | undefined | null, fallbackLabel: string, size = '800x600') => {
+  const normalizeImage = (url: string | undefined | null) => {
     if (url && (/^https?:\/\//i.test(url) || /^data:image\//i.test(url) || url.startsWith('/'))) return url;
-    const label = fallbackLabel ? fallbackLabel.substring(0, 60) : 'Image';
-    return `https://placehold.co/${size}?text=${encodeURIComponent(label)}`;
+    return '';
   };
 
   // Reusable selection + filter for influencers (by text)
@@ -120,7 +126,7 @@ export default function BrandDashboard() {
   // is the source of truth for which section is active.
   useEffect(() => {
     const nextTab: TabType =
-      tab === 'influencers' || tab === 'dataset' ? (tab as TabType) : 'product';
+      tab === 'influencers' || tab === 'dataset' || tab === 'llm' ? (tab as TabType) : 'product';
     if (nextTab !== activeTab) {
       setActiveTab(nextTab);
     }
@@ -193,27 +199,25 @@ export default function BrandDashboard() {
 
         const normalizedCards = (cardsRes.cards || []).map((card) => ({
           ...card,
-          imageUrl: normalizeImage(card.imageUrl, card.query),
+          imageUrl: normalizeImage(card.imageUrl),
         }));
 
         setData({
           brand: {
             ...brandRes.brand,
-            productImages: (brandRes.brand.productImages ?? []).map((img) =>
-              normalizeImage(img, brandRes.brand.name, '800x400'),
-            ),
+            productImages: (brandRes.brand.productImages ?? []).map((img) => normalizeImage(img)),
           },
           personas: personasRes.personas,
           environments: environmentsRes.environments,
           influencers: (influencersRes.influencers || []).map((inf) => ({
             ...inf,
-            imageUrl: normalizeImage(inf.imageUrl, inf.name, '400x300'),
-            actionImageUrls: (inf.actionImageUrls || []).map((img) => normalizeImage(img, inf.name, '400x300')),
+            imageUrl: normalizeImage(inf.imageUrl),
+            actionImageUrls: (inf.actionImageUrls || []).map((img) => normalizeImage(img)),
           })),
           cards: normalizedCards,
         });
         setBrandProductImages(
-          (brandRes.brand.productImages ?? []).map((img) => normalizeImage(img, brandRes.brand.name, '800x400')),
+          (brandRes.brand.productImages ?? []).map((img) => normalizeImage(img)),
         );
 
         const initialStates: Record<string, { enabled: boolean }> = {};
@@ -241,9 +245,7 @@ export default function BrandDashboard() {
                 name: seed.brand.name,
                 domain: seed.brand.domain,
                 description: seed.brand.description,
-                productImages: (seed.brand.productImages ?? []).map((img: string) =>
-                  normalizeImage(img, seed.brand.name, '800x400'),
-                ),
+                productImages: (seed.brand.productImages ?? []).map((img: string) => normalizeImage(img)),
                 contentSources: seed.brand.contentSources ?? [],
                 urlSlug: 'flowform',
               },
@@ -266,8 +268,8 @@ export default function BrandDashboard() {
                 name: inf.name,
                 bio: `${inf.role}: ${inf.bioShort} (Age ${inf.ageRange})`,
                 domain: inf.role,
-                imageUrl: normalizeImage(inf.imageUrl, inf.name, '400x300'),
-                actionImageUrls: (inf.actionImageUrls || []).map((img: string) => normalizeImage(img, inf.name, '400x300')),
+                imageUrl: normalizeImage(inf.imageUrl),
+                actionImageUrls: (inf.actionImageUrls || []).map((img: string) => normalizeImage(img)),
                 enabled: inf.enabled ?? true,
               })),
               cards: (seed.cards || []).map((c: any) => ({
@@ -278,7 +280,7 @@ export default function BrandDashboard() {
                 environmentId: c.environmentId ?? null,
                 query: c.query,
                 response: c.response,
-                imageUrl: normalizeImage(c.imageUrl, c.query),
+                imageUrl: normalizeImage(c.imageUrl),
                 imageBrief: c.imageBrief ?? '',
                 status: (c.status as 'draft' | 'published' | string) ?? 'draft',
                 viewCount: c.viewCount ?? 0,
@@ -331,6 +333,38 @@ export default function BrandDashboard() {
     return () => clearInterval(interval);
   }, [data?.influencers]);
 
+  // Keep the selected influencer + gallery in sync when polling updates status/images
+  useEffect(() => {
+    if (!selectedInfluencer || !data?.influencers) return;
+    const latest = data.influencers.find((inf) => inf.influencerId === selectedInfluencer.influencerId);
+    if (!latest) return;
+
+    const latestStatus = (latest as any).status;
+    const prevStatus = (selectedInfluencer as any).status;
+    const latestActions = latest.actionImageUrls || [];
+    const currentGalleryActions = gallery?.actionImages || [];
+    const hasNewImages = latestActions.length > currentGalleryActions.length;
+    const headshotChanged = latest.imageUrl && latest.imageUrl !== (gallery?.headshot || '');
+    const statusChanged = latestStatus !== prevStatus;
+
+    if (hasNewImages || headshotChanged || statusChanged) {
+      setSelectedInfluencer(latest);
+      setGallery({
+        headshot: latest.imageUrl || gallery?.headshot || '',
+        actionImages: hasNewImages ? latestActions : currentGalleryActions,
+      });
+      setGalleryError(null);
+      setGalleryLoading(false);
+    }
+  }, [
+    data?.influencers,
+    selectedInfluencer?.influencerId,
+    (selectedInfluencer as any)?.status,
+    selectedInfluencer?.imageUrl,
+    gallery?.actionImages?.length,
+    gallery?.headshot,
+  ]);
+
   const handleToggleInfluencer = async (influencerId: string, enabled: boolean) => {
     const applyLocal = () => {
       setInfluencerStates(prev => ({
@@ -376,23 +410,16 @@ export default function BrandDashboard() {
     try {
       setFindingInfluencer(true);
       setFindStatus('Submitting find-new request…');
-      const { influencers, created = [], updated = [] } = await apiClient.findNewInfluencers(payload);
-      setFindStatus('Generating headshot and action images (fal.ai)… this can take up to ~45s');
-      setData(prev => {
-        if (!prev) return prev;
-        const byId = new Map<string, Influencer>();
-        prev.influencers.forEach((inf) => byId.set(inf.influencerId, inf));
-        influencers.forEach((inf) => {
-          const existing = prev.influencers.find((e) => e.name === inf.name || e.influencerId === inf.influencerId);
-          const merged = existing ? { ...existing, ...inf } : inf;
-          byId.set(merged.influencerId, merged);
-        });
-        const mergedList = Array.from(byId.values());
-        return { ...prev, influencers: mergedList };
-      });
-      setInfluencerStates((prev) => {
+      const { influencer } = await apiClient.findNewInfluencers(payload);
+      setFindStatus('Generating headshot…');
+      await apiClient.generateInfluencerHeadshot(influencer.influencerId);
+      setFindStatus('Generating action images…');
+      await apiClient.generateInfluencerActions(influencer.influencerId);
+      const refreshed = await apiClient.getInfluencers();
+      setData(prev => (prev ? { ...prev, influencers: refreshed.influencers } : prev));
+      setInfluencerStates(prev => {
         const next: Record<string, { enabled: boolean }> = { ...prev };
-        influencers.forEach((inf) => {
+        refreshed.influencers.forEach((inf) => {
           next[inf.influencerId] = { enabled: inf.enabled };
         });
         return next;
@@ -400,7 +427,7 @@ export default function BrandDashboard() {
       if (payload) {
         setNewInfluencerDraft({ name: '', domain: '', bio: '' });
       }
-      setFindStatus(`Done: created ${created.length}, upgraded ${updated.length}.`);
+      setFindStatus('Done.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to match influencers');
       setFindStatus('Find-new failed. Please retry.');
@@ -471,6 +498,38 @@ export default function BrandDashboard() {
     }
   };
 
+  const handleLlmGenerate = async () => {
+    if (!llmPrompt.trim()) return;
+    setLlmLoading(true);
+    setLlmError(null);
+    try {
+      const { text } = await apiClient.generateContent(llmPrompt.trim());
+      setLlmResponse(text);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'LLM call failed';
+      setLlmError(msg);
+      setLlmResponse('');
+    } finally {
+      setLlmLoading(false);
+    }
+  };
+
+  const handleImageGenerate = async () => {
+    if (!imgPrompt.trim()) return;
+    setImgLoading(true);
+    setImgError(null);
+    try {
+      const { url } = await apiClient.generateImage(imgPrompt.trim());
+      setImgUrl(url);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Image generation failed';
+      setImgError(msg);
+      setImgUrl('');
+    } finally {
+      setImgLoading(false);
+    }
+  };
+
   const handleDeleteSelectedInfluencers = async () => {
     if (!data) return;
     const ids = Array.from(selectedInfluencerIds);
@@ -508,7 +567,9 @@ export default function BrandDashboard() {
     const cachedGallery = { headshot: inf.imageUrl, actionImages: inf.actionImageUrls || [] };
     setGallery(cachedGallery);
 
-    if (cachedGallery.actionImages.length >= 2) {
+    const seedOrDemo = seedMode || data?.brand.urlSlug === 'flowform';
+
+    if (cachedGallery.actionImages.length >= 2 || seedOrDemo) {
       setGalleryLoading(false);
       return;
     }
@@ -519,9 +580,14 @@ export default function BrandDashboard() {
       setGallery(galleryRes);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to load gallery';
+      console.warn('Gallery load failed', msg);
       setGalleryError(msg);
-      setError(msg);
-      setGallery(null);
+      // Keep existing cached gallery (if any) so the UI remains usable even if the gallery endpoint fails (e.g. missing fal key in prod).
+      if (!cachedGallery.headshot && !cachedGallery.actionImages.length) {
+        setGallery(null);
+      } else {
+        setGallery(cachedGallery);
+      }
     } finally {
       setGalleryLoading(false);
     }
@@ -647,7 +713,6 @@ export default function BrandDashboard() {
     setError(null);
     setGenerationSummary(null);
     setDatasetRunStatus('running');
-    setDatasetRunId(null);
 
     try {
       // If specific influencers are selected, ensure they are marked as enabled
@@ -658,7 +723,6 @@ export default function BrandDashboard() {
 
       const workflowResult = await apiClient.generateCards(data.brand.brandId);
       if (workflowResult.runId) {
-        setDatasetRunId(workflowResult.runId);
         const poll = async (attempt = 0) => {
           try {
             const runRes = await apiClient.getWorkflowRun(workflowResult.runId!);
@@ -754,11 +818,22 @@ export default function BrandDashboard() {
     }
   };
 
+  const resolveApiBase = () => {
+    const envBase = import.meta.env.VITE_API_URL?.trim();
+    const hasWindow = typeof window !== 'undefined';
+    const origin = hasWindow ? window.location.origin : undefined;
+    const looksLocal = envBase && (envBase.includes('127.0.0.1') || envBase.includes('localhost'));
+    if (looksLocal && origin) return origin;
+    if (envBase) return envBase;
+    if (origin) return origin;
+    return 'http://localhost:3001';
+  };
+
   // Ensure dataset link is available once data is loaded
   useEffect(() => {
     const id = brandId || data?.brand.brandId;
     if (!id) return;
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const baseUrl = resolveApiBase();
     const datasetBase = baseUrl.endsWith('/api') ? baseUrl.replace(/\/api\/?$/, '') : baseUrl;
     const url = `${datasetBase}/api/dataset/${id}`;
     if (datasetUrl !== url) {
@@ -797,7 +872,7 @@ export default function BrandDashboard() {
   });
 
   const datasetHref = (() => {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const baseUrl = resolveApiBase();
     const datasetBase = baseUrl.endsWith('/api') ? baseUrl.replace(/\/api\/?$/, '') : baseUrl;
     const id = brandId ?? data?.brand.brandId;
     return id ? `${datasetBase}/api/dataset/${id}` : '#';
@@ -829,6 +904,12 @@ export default function BrandDashboard() {
           style={tabStyle(activeTab === 'dataset')}
         >
           Dataset
+        </button>
+        <button
+          onClick={() => navigate(`/brand/${brandId ?? data.brand.brandId}/llm`)}
+          style={tabStyle(activeTab === 'llm')}
+        >
+          LLM Test
         </button>
       </div>
 
@@ -995,6 +1076,97 @@ export default function BrandDashboard() {
               </div>
             )}
           </>
+        )}
+        {activeTab === 'llm' && (
+          <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))' }}>
+            <div style={{ background: 'white', border: '1px solid #e9ecef', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <h2 style={{ marginTop: 0, marginBottom: '0.5rem' }}>LLM Test (fal.ai / openrouter gpt-oss-120b)</h2>
+              <p style={{ color: '#495057', marginTop: 0, marginBottom: '1rem' }}>
+                Enter a prompt and run it through `/api/content/generate` (server-side, fal.ai OpenRouter gpt-oss-120b).
+              </p>
+              <textarea
+                value={llmPrompt}
+                onChange={(e) => setLlmPrompt(e.target.value)}
+                rows={4}
+                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ced4da', fontSize: '1rem', marginBottom: '0.75rem', fontFamily: 'inherit' }}
+              />
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={handleLlmGenerate}
+                  disabled={llmLoading}
+                  style={{
+                    padding: '0.75rem 1.25rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: llmLoading ? '#6c757d' : '#007bff',
+                    color: 'white',
+                    cursor: llmLoading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                  }}
+                >
+                  {llmLoading ? 'Generating…' : 'Generate'}
+                </button>
+                <code style={{ background: '#f1f3f5', padding: '0.35rem 0.5rem', borderRadius: '6px', fontSize: '0.9rem' }}>
+                  {`curl -X POST https://cloudflare.wisdom-pixels.pages.dev/api/content/generate -H 'Content-Type: application/json' -d '{\"prompt\":\"Hello\"}'`}
+                </code>
+              </div>
+              {llmError && (
+                <div style={{ color: '#c53030', marginBottom: '0.5rem' }}>
+                  {llmError}
+                </div>
+              )}
+              <div style={{ background: '#f8f9fa', border: '1px solid #e9ecef', borderRadius: '8px', padding: '1rem', minHeight: '120px' }}>
+                <strong>Response:</strong>
+                <div style={{ whiteSpace: 'pre-wrap', marginTop: '0.5rem', color: '#212529' }}>
+                  {llmResponse || (llmLoading ? 'Waiting for response…' : 'Run a prompt to see output.')}
+                </div>
+              </div>
+            </div>
+            <div style={{ background: 'white', border: '1px solid #e9ecef', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <h2 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Image Test (Nano Banana Pro)</h2>
+              <p style={{ color: '#495057', marginTop: 0, marginBottom: '1rem' }}>
+                Generate an image with fal.ai Nano Banana Pro via `/api/images/generate`.
+              </p>
+              <textarea
+                value={imgPrompt}
+                onChange={(e) => setImgPrompt(e.target.value)}
+                rows={4}
+                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #ced4da', fontSize: '1rem', marginBottom: '0.75rem', fontFamily: 'inherit' }}
+              />
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={handleImageGenerate}
+                  disabled={imgLoading}
+                  style={{
+                    padding: '0.75rem 1.25rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: imgLoading ? '#6c757d' : '#28a745',
+                    color: 'white',
+                    cursor: imgLoading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                  }}
+                >
+                  {imgLoading ? 'Generating…' : 'Generate Image'}
+                </button>
+                <code style={{ background: '#f1f3f5', padding: '0.35rem 0.5rem', borderRadius: '6px', fontSize: '0.9rem' }}>
+                  {`curl -X POST https://cloudflare.wisdom-pixels.pages.dev/api/images/generate -H 'Content-Type: application/json' -d '{\"prompt\":\"Photo of FlowForm motion suit in action\"}'`}
+                </code>
+              </div>
+              {imgError && (
+                <div style={{ color: '#c53030', marginBottom: '0.5rem' }}>
+                  {imgError}
+                </div>
+              )}
+              <div style={{ background: '#f8f9fa', border: '1px solid #e9ecef', borderRadius: '8px', padding: '1rem', minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {imgUrl ? (
+                  <img src={imgUrl} alt="Generated" style={{ maxWidth: '100%', borderRadius: '8px', border: '1px solid #dee2e6' }} />
+                ) : (
+                  <div style={{ color: '#6c757d' }}>{imgLoading ? 'Waiting for image…' : 'Run a prompt to see an image.'}</div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
         {activeTab === 'dataset' && (
           <>
